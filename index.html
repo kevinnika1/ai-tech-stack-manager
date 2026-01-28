@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Tech Stack Dashboard</title>
+    <meta name="description" content="Intelligent tech stack management with AI-powered version tracking and recommendations">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-robot"></i> AI Tech Stack Manager</h1>
+                <p class="subtitle">Intelligent technology stack analysis with AI-powered recommendations</p>
+                <div class="header-actions">
+                    <button class="ai-analyze-btn" id="aiAnalyzeAll" title="AI Analyze All Technologies">
+                        <i class="fas fa-brain"></i> AI Analysis
+                    </button>
+                    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- AI Recommendations Panel -->
+        <section class="ai-recommendations" id="aiRecommendations" style="display: none;">
+            <div class="recommendations-header">
+                <h2><i class="fas fa-lightbulb"></i> AI Recommendations</h2>
+                <button class="close-btn" id="closeRecommendations">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="recommendations-content" id="recommendationsContent">
+                <!-- AI recommendations will be populated here -->
+            </div>
+        </section>
+
+        <!-- Add Technology Section -->
+        <section class="add-tech-section">
+            <div class="add-tech-card">
+                <h2><i class="fas fa-plus-circle"></i> Add Technology</h2>
+                <form id="addTechForm" class="tech-form">
+                    <div class="form-group">
+                        <label for="techName">Technology Name</label>
+                        <input type="text" id="techName" placeholder="e.g., React, Node.js, PostgreSQL" required>
+                        <div class="suggestions" id="techSuggestions"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="currentVersion">Current Version</label>
+                        <input type="text" id="currentVersion" placeholder="e.g., 18.2.0, 16.14.0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="environment">Environment/Context (Optional)</label>
+                        <select id="environment">
+                            <option value="">Select environment</option>
+                            <option value="production">Production</option>
+                            <option value="staging">Staging</option>
+                            <option value="development">Development</option>
+                            <option value="all">All Environments</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="add-btn">
+                        <i class="fas fa-magic"></i> Add & Analyze with AI
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Stats Overview -->
+        <section class="stats-section">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon high-priority">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="criticalCount">0</h3>
+                        <p>Critical Updates</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon medium-priority">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="recommendedCount">0</h3>
+                        <p>Recommended Updates</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon low-priority">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="upToDateCount">0</h3>
+                        <p>Up to Date</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon ai-powered">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="aiInsightsCount">0</h3>
+                        <p>AI Insights</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Controls -->
+        <section class="controls-section">
+            <div class="controls">
+                <div class="search-container">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="Search technologies...">
+                </div>
+                <div class="filter-container">
+                    <select id="priorityFilter">
+                        <option value="">All Priorities</option>
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div class="sort-container">
+                    <select id="sortBy">
+                        <option value="priority">Sort by AI Priority</option>
+                        <option value="technology">Sort by Technology</option>
+                        <option value="eol">Sort by EOL Date</option>
+                        <option value="lastAnalyzed">Sort by Last Analyzed</option>
+                    </select>
+                </div>
+                <div class="action-buttons">
+                    <button class="export-btn" id="exportData">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="import-btn" id="importData">
+                        <i class="fas fa-upload"></i> Import
+                    </button>
+                    <button class="remove-all-btn" id="removeAllData" title="Remove all technologies">
+                        <i class="fas fa-trash-alt"></i> Remove All
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tech Stack Grid -->
+        <section class="tech-grid-section">
+            <div class="tech-grid" id="techGrid">
+                <!-- Tech cards will be dynamically inserted here -->
+            </div>
+        </section>
+
+        <!-- Loading States -->
+        <div class="loading" id="loading" style="display: none;">
+            <div class="ai-loading">
+                <i class="fas fa-robot fa-spin"></i>
+                <p>AI is analyzing your tech stack...</p>
+                <div class="loading-steps">
+                    <span class="step active">Fetching latest versions</span>
+                    <span class="step">Checking EOL dates</span>
+                    <span class="step">Analyzing priorities</span>
+                    <span class="step">Generating recommendations</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error message -->
+        <div class="error-message" id="errorMessage" style="display: none;">
+            <i class="fas fa-exclamation-circle"></i>
+            <p id="errorText">Error occurred. Please try again.</p>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div class="modal" id="importModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Import Technologies</h3>
+                <button class="close-btn" id="closeImportModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="import-options">
+                    <div class="import-option">
+                        <h4>Upload CSV File</h4>
+                        <input type="file" id="csvFileInput" accept=".csv">
+                        <p class="help-text">Upload existing tech stack CSV</p>
+                    </div>
+                    <div class="import-option">
+                        <h4>Paste JSON Data</h4>
+                        <textarea id="jsonDataInput" placeholder="Paste JSON data here..."></textarea>
+                        <p class="help-text">Import from JSON export</p>
+                    </div>
+                    <div class="import-option">
+                        <h4>Bulk Add</h4>
+                        <textarea id="bulkAddInput" placeholder="React 18.2.0&#10;Node.js 16.14.0&#10;PostgreSQL 14.5"></textarea>
+                        <p class="help-text">One technology per line: "Name Version"</p>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-secondary" id="cancelImport">Cancel</button>
+                    <button class="btn-primary" id="processImport">
+                        <i class="fas fa-magic"></i> Import & Analyze
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2026 AI Tech Stack Manager. Powered by AI analysis. Last sync: <span id="lastSync">Never</span></p>
+            <div class="footer-links">
+                <a href="#" id="aboutAI">About AI Features</a>
+                <a href="#" id="dataPrivacy">Data Privacy</a>
+                <a href="#" id="apiStatus">API Status: <span class="status-indicator online"></span></a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Hidden file input for export -->
+    <input type="file" id="hiddenFileInput" accept=".csv,.json" style="display: none;">
+
+    <script src="script.js"></script>
+</body>
+</html>

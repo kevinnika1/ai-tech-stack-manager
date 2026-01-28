@@ -153,5 +153,3 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ---
 
 **Built with ❤️ for modern development teams who demand intelligent tooling.**
-
-[Report Issues](https://github.com/yourusername/tech-stack/issues) | [Request Features](https://github.com/yourusername/tech-stack/discussions)

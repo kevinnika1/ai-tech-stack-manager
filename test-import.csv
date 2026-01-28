@@ -1,4 +1,4 @@
 Technology,Version in use,Latest Stable Version,EOL,Notes,Check URL,Priority
-Java,17,25,2029,Amazon Corretto,https://endoflife.date/amazon-corretto,medium
-React,17.0.2,18.2.0,2025,Frontend framework,https://react.dev,high
-Node.js,16.20.0,20.11.0,2024,Runtime environment,https://nodejs.org,critical
+Java,17,25,2029,Amazon Corretto,https://endoflife.date/amazon-corretto,
+React,18,,,Frontend framework,https://react.dev,
+Node.js,20,,,Runtime environment,https://nodejs.org,

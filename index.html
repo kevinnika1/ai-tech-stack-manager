@@ -54,14 +54,8 @@
                         <input type="text" id="currentVersion" placeholder="e.g., 18.2.0, 16.14.0" required>
                     </div>
                     <div class="form-group">
-                        <label for="environment">Environment/Context (Optional)</label>
-                        <select id="environment">
-                            <option value="">Select environment</option>
-                            <option value="production">Production</option>
-                            <option value="staging">Staging</option>
-                            <option value="development">Development</option>
-                            <option value="all">All Environments</option>
-                        </select>
+                        <label for="product">Product</label>
+                        <input type="text" id="product" placeholder="e.g., Nexus, NDC, Core Platform" required>
                     </div>
                     <button type="submit" class="add-btn">
                         <i class="fas fa-magic"></i> Add & Analyze with AI
@@ -109,6 +103,15 @@
                         <p>AI Insights</p>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <!-- Product Tabs -->
+        <section class="product-tabs-section">
+            <div class="product-tabs" id="productTabs">
+                <button class="tab-button active" data-product="" id="allProductsTab">
+                    <i class="fas fa-layer-group"></i> All Products
+                </button>
             </div>
         </section>
 

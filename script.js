@@ -8,9 +8,17 @@ class AITechStackManager {
             versions: 'https://api.github.com/repos', // GitHub API for open source projects
             npm: 'https://registry.npmjs.org',
             pypi: 'https://pypi.org/pypi',
-            endoflife: 'https://endoflife.date/api'
+            endoflife: 'https://endoflife.date/api',
+            osv: 'https://api.osv.dev/v1/query' // OSV vulnerability database
         };
-        this.knownTechnologies = this.loadKnownTechnologies();
+        // Local AI configuration
+        this.localAI = {
+            ollamaURL: 'http://localhost:11434',
+            defaultModel: 'llama3.2:3b',
+            enabled: localStorage.getItem('localAI_enabled') === 'true',
+            available: false
+        };
+        this.currentProductFilter = ''; // Initialize product filter
         this.init();
     }
 
@@ -23,52 +31,11 @@ class AITechStackManager {
         this.renderTechCards();
         this.updateLastSync();
         
+        // Initialize local AI
+        await this.initializeLocalAI();
+        
         // Auto-sync every 5 minutes
         setInterval(() => this.backgroundSync(), 5 * 60 * 1000);
-    }
-
-    loadKnownTechnologies() {
-        return {
-            // Web Technologies
-            'react': { category: 'frontend', api: 'npm', repo: 'facebook/react', staticEol: 'No formal EOL (Facebook maintains)', eolPattern: 'Major versions supported ~18 months' },
-            'vue': { category: 'frontend', api: 'npm', repo: 'vuejs/vue', staticEol: 'Vue 2: Dec 2023, Vue 3: Active' },
-            'angular': { category: 'frontend', api: 'npm', repo: 'angular/angular', staticEol: 'Major versions: 18 months LTS' },
-            'next.js': { category: 'frontend', api: 'npm', repo: 'vercel/next.js', npmName: 'next', staticEol: 'Major versions supported ~12-18 months', eolApi: 'nextjs' },
-            'nextjs': { category: 'frontend', api: 'npm', repo: 'vercel/next.js', npmName: 'next', staticEol: 'Major versions supported ~12-18 months', eolApi: 'nextjs' },
-            'nuxt': { category: 'frontend', api: 'npm', repo: 'nuxt/nuxt', staticEol: 'Nuxt 2: June 2024, Nuxt 3: Active' },
-            'svelte': { category: 'frontend', api: 'npm', repo: 'sveltejs/svelte', staticEol: 'Major versions: ~24 months' },
-            
-            // Backend Technologies
-            'node.js': { category: 'runtime', api: 'static', staticVersion: '22.12.0', eolApi: 'nodejs', staticEol: 'Node 18: April 2025, Node 20: April 2026, Node 22: April 2027', checkUrl: 'https://nodejs.org/en/download/releases/' },
-            'node': { category: 'runtime', api: 'static', staticVersion: '22.12.0', eolApi: 'nodejs', staticEol: 'Node 18: April 2025, Node 20: April 2026, Node 22: April 2027', checkUrl: 'https://nodejs.org/en/download/releases/' },
-            'express': { category: 'backend', api: 'npm', repo: 'expressjs/express', staticEol: 'Active maintenance, no formal EOL' },
-            'fastapi': { category: 'backend', api: 'pypi', repo: 'tiangolo/fastapi', staticEol: 'Active development, no formal EOL' },
-            'django': { category: 'backend', api: 'pypi', repo: 'django/django', staticEol: 'LTS versions: 3 years support' },
-            'flask': { category: 'backend', api: 'pypi', repo: 'pallets/flask', staticEol: 'Active maintenance, no formal EOL' },
-            'spring boot': { category: 'backend', api: 'static', staticVersion: '3.3.6', eolApi: 'spring-boot', staticEol: 'Commercial support available, OSS ongoing', checkUrl: 'https://spring.io/projects/spring-boot' },
-            
-            // Databases
-            'postgresql': { category: 'database', api: 'static', staticVersion: '16.6', eolApi: 'postgresql', checkUrl: 'https://www.postgresql.org/download/' },
-            'mysql': { category: 'database', api: 'static', staticVersion: '8.4.3', eolApi: 'mysql', checkUrl: 'https://dev.mysql.com/downloads/' },
-            'mongodb': { category: 'database', api: 'static', staticVersion: '8.0', eolApi: 'mongodb', checkUrl: 'https://www.mongodb.com/try/download/community' },
-            'redis': { category: 'database', api: 'static', staticVersion: '7.4.1', eolApi: 'redis', checkUrl: 'https://redis.io/download/' },
-            
-            // Languages (using static versions as APIs are unreliable for languages)
-            'python': { category: 'language', api: 'static', staticVersion: '3.13.1', eolApi: 'python', staticEol: '2029-10', checkUrl: 'https://www.python.org/downloads/' },
-            'java': { category: 'language', api: 'static', staticVersion: '25.0.0', ltsVersion: '25', eolApi: 'java', staticEol: '2033-09', staticSupportEnd: '2030-09', checkUrl: 'https://openjdk.org/projects/jdk/' },
-            'go': { category: 'language', api: 'static', staticVersion: '1.23.4', eolApi: 'go', staticEol: 'Rolling release', checkUrl: 'https://golang.org/dl/' },
-            'rust': { category: 'language', api: 'static', staticVersion: '1.83.0', staticEol: 'Rolling release (6 week cycle)', checkUrl: 'https://forge.rust-lang.org/channel-releases.html' },
-            
-            // DevOps & Infrastructure
-            'kubernetes': { category: 'orchestration', api: 'static', staticVersion: '1.31.3', eolApi: 'kubernetes', checkUrl: 'https://kubernetes.io/releases/' },
-            'docker': { category: 'containerization', api: 'static', staticVersion: '27.3.1', eolApi: 'docker-engine', checkUrl: 'https://docs.docker.com/engine/release-notes/' },
-            'nginx': { category: 'webserver', api: 'static', staticVersion: '1.27.3', eolApi: 'nginx', checkUrl: 'http://nginx.org/en/download.html' },
-            'elasticsearch': { category: 'search', api: 'static', staticVersion: '8.15.3', eolApi: 'elasticsearch', checkUrl: 'https://www.elastic.co/downloads/elasticsearch' },
-            
-            // Additional common technologies
-            'gradle': { category: 'build', api: 'static', staticVersion: '8.11.1', checkUrl: 'https://gradle.org/releases/' },
-            'maven': { category: 'build', api: 'static', staticVersion: '3.9.9', checkUrl: 'https://maven.apache.org/download.cgi' }
-        };
     }
 
     setupTheme() {
@@ -131,6 +98,15 @@ class AITechStackManager {
             this.showRemoveAllConfirmation();
         });
 
+        // Product tabs
+        document.getElementById('productTabs').addEventListener('click', (e) => {
+            if (e.target.closest('.tab-button')) {
+                const button = e.target.closest('.tab-button');
+                const product = button.dataset.product;
+                this.switchToProduct(product);
+            }
+        });
+
         // Modal controls
         document.getElementById('closeImportModal').addEventListener('click', () => {
             this.hideImportModal();
@@ -158,35 +134,8 @@ class AITechStackManager {
     }
 
     showSuggestions(query) {
-        const suggestionsContainer = document.getElementById('techSuggestions');
-        
-        if (query.length < 2) {
-            this.hideSuggestions();
-            return;
-        }
-
-        const matches = Object.keys(this.knownTechnologies)
-            .filter(tech => tech.toLowerCase().includes(query.toLowerCase()))
-            .slice(0, 5);
-
-        if (matches.length === 0) {
-            this.hideSuggestions();
-            return;
-        }
-
-        suggestionsContainer.innerHTML = matches
-            .map(tech => `<div class="suggestion-item" data-tech="${tech}">${tech}</div>`)
-            .join('');
-        
-        suggestionsContainer.style.display = 'block';
-
-        // Add click handlers
-        suggestionsContainer.querySelectorAll('.suggestion-item').forEach(item => {
-            item.addEventListener('click', () => {
-                document.getElementById('techName').value = item.dataset.tech;
-                this.hideSuggestions();
-            });
-        });
+        // No autocomplete suggestions - let users enter any technology
+        this.hideSuggestions();
     }
 
     hideSuggestions() {
@@ -196,27 +145,28 @@ class AITechStackManager {
     async addTechnology() {
         const techName = document.getElementById('techName').value.trim();
         const currentVersion = document.getElementById('currentVersion').value.trim();
-        const environment = document.getElementById('environment').value;
+        const product = document.getElementById('product').value.trim();
 
-        if (!techName || !currentVersion) {
-            this.showError('Please provide both technology name and current version');
+        if (!techName || !currentVersion || !product) {
+            this.showError('Please fill in all required fields (Technology, Version, and Product)');
             return;
         }
 
         this.showLoading('Adding and analyzing technology...');
 
         try {
-            const techData = await this.aiAnalyzeTechnology(techName, currentVersion, environment);
+            const techData = await this.aiAnalyzeTechnology(techName, currentVersion, product);
             this.techData.push(techData);
             this.saveData();
             this.renderStats();
             this.renderTechCards();
+            this.updateProductTabs(); // Update product tabs with new product
             this.clearForm();
             this.hideLoading();
             
             // Show recommendations if any critical issues found
             if (techData.aiPriority === 'critical') {
-                this.showRecommendationForTech(techData);
+                this.showMessage(`⚠️ Critical: ${techData.technology} requires immediate attention. Check recommendations for upgrade details.`, 'warning');
             }
         } catch (error) {
             this.hideLoading();
@@ -224,279 +174,1749 @@ class AITechStackManager {
         }
     }
 
-    async aiAnalyzeTechnology(name, currentVersion, environment) {
-        const normalizedName = name.toLowerCase();
-        const knownTech = this.knownTechnologies[normalizedName];
-        
+    async aiAnalyzeTechnology(name, currentVersion, product) {
         const techData = {
             id: Date.now().toString(),
             technology: name,
             currentVersion: currentVersion,
-            environment: environment,
+            product: product,
             addedDate: new Date().toISOString(),
             lastAnalyzed: new Date().toISOString()
         };
 
-        // Get latest version information
+        // Try to get latest version from multiple API sources
         try {
-            const versionInfo = await this.fetchLatestVersion(normalizedName, knownTech);
+            const versionInfo = await this.fetchLatestVersionFromAPIs(name);
             techData.latestVersion = versionInfo.latest;
             techData.checkUrl = versionInfo.url;
-            
-            // Get EOL information
-            if (knownTech?.eolApi || knownTech?.staticEol) {
-                const eolInfo = await this.fetchEOLInfo(knownTech.eolApi, knownTech, currentVersion);
+            techData.detectedType = versionInfo.type;
+        } catch (error) {
+            console.warn(`Failed to fetch version for ${name}:`, error);
+            techData.latestVersion = 'Unknown';
+            techData.checkUrl = `https://www.google.com/search?q=${encodeURIComponent(name + ' latest version')}`;
+        }
+
+        // Try to get EOL information
+        try {
+            const eolInfo = await this.fetchEOLFromAPIs(name, currentVersion);
+            if (eolInfo) {
                 techData.eolDate = eolInfo.eol;
                 techData.supportStatus = eolInfo.support;
                 techData.eolSource = eolInfo.source;
                 techData.eolCycle = eolInfo.cycle;
             }
-
-            // AI Analysis
-            const aiAnalysis = this.performAIAnalysis(techData, knownTech);
-            Object.assign(techData, aiAnalysis);
-
         } catch (error) {
-            console.warn(`Failed to fetch data for ${name}:`, error);
-            // Fallback AI analysis with limited data
-            const aiAnalysis = this.performAIAnalysis(techData, knownTech);
-            Object.assign(techData, aiAnalysis);
+            console.warn(`Failed to fetch EOL info for ${name}:`, error);
         }
+
+        // Check for vulnerabilities
+        try {
+            const vulnInfo = await this.checkVulnerabilities(name, currentVersion, techData.detectedType);
+            if (vulnInfo) {
+                techData.vulnerabilities = vulnInfo.vulnerabilities;
+                techData.vulnerabilityCount = vulnInfo.count;
+                techData.criticalVulns = vulnInfo.critical;
+                techData.highVulns = vulnInfo.high;
+                techData.securityScore = vulnInfo.securityScore;
+                techData.lastSecurityCheck = new Date().toISOString();
+            }
+        } catch (error) {
+            console.warn(`Failed to check vulnerabilities for ${name}:`, error);
+        }
+
+        // Check for vulnerabilities
+        try {
+            const vulnInfo = await this.checkVulnerabilities(name, currentVersion, techData.detectedType);
+            if (vulnInfo) {
+                techData.vulnerabilities = vulnInfo.vulnerabilities;
+                techData.vulnerabilityCount = vulnInfo.count;
+                techData.criticalVulns = vulnInfo.critical;
+                techData.highVulns = vulnInfo.high;
+                techData.securityScore = vulnInfo.securityScore;
+                techData.lastSecurityCheck = new Date().toISOString();
+            }
+        } catch (error) {
+            console.warn(`Failed to check vulnerabilities for ${name}:`, error);
+        }
+
+        // Perform AI Analysis (or rule-based fallback)
+        const analysis = await this.performAIAnalysis(techData);
+        Object.assign(techData, analysis);
 
         return techData;
     }
 
-    async fetchLatestVersion(techName, knownTech) {
-        if (!knownTech) {
-            throw new Error('Unknown technology');
+    async fetchLatestVersionFromAPIs(techName) {
+        const normalizedName = techName.toLowerCase();
+        const results = [];
+        
+        // Smart API selection based on technology type
+        const apiOrder = this.getAPIOrderForTech(normalizedName);
+        
+        for (const apiType of apiOrder) {
+            try {
+                let result = null;
+                
+                switch (apiType) {
+                    case 'npm':
+                        result = await this.tryNpmAPI(normalizedName);
+                        break;
+                    case 'pypi':
+                        result = await this.tryPyPIAPI(normalizedName);
+                        break;
+                    case 'github':
+                        result = await this.tryGitHubAPI(normalizedName);
+                        break;
+                    case 'official':
+                        result = await this.tryOfficialSources(normalizedName);
+                        break;
+                    case 'eol':
+                        result = await this.tryEOLAPI(normalizedName);
+                        break;
+                }
+                
+                if (result) {
+                    results.push(result);
+                    break; // Use first successful result
+                }
+            } catch (error) {
+                console.warn(`${apiType} check failed for ${normalizedName}:`, error);
+                continue;
+            }
         }
-
-        try {
-            let url, response, data;
-
-            switch (knownTech.api) {
-                case 'static':
-                    // Use pre-defined static versions for technologies where APIs are unreliable
-                    return {
-                        latest: knownTech.staticVersion,
-                        url: knownTech.checkUrl || `https://www.google.com/search?q=${encodeURIComponent(techName + ' latest version')}`
-                    };
-
-                case 'npm':
-                    const npmName = knownTech.npmName || techName;
-                    url = `${this.apiEndpoints.npm}/${npmName}/latest`;
-                    response = await fetch(url);
-                    if (!response.ok) throw new Error(`NPM API failed: ${response.status}`);
-                    data = await response.json();
-                    return {
-                        latest: data.version,
-                        url: `https://www.npmjs.com/package/${npmName}`
-                    };
-
-                case 'pypi':
-                    url = `${this.apiEndpoints.pypi}/${techName}/json`;
-                    response = await fetch(url);
-                    if (!response.ok) throw new Error(`PyPI API failed: ${response.status}`);
-                    data = await response.json();
-                    return {
-                        latest: data.info.version,
-                        url: `https://pypi.org/project/${techName}/`
-                    };
-
-                case 'github':
-                    url = `${this.apiEndpoints.versions}/${knownTech.repo}/releases/latest`;
-                    response = await fetch(url);
-                    if (!response.ok) throw new Error(`GitHub API failed: ${response.status}`);
-                    data = await response.json();
+        
+        // Return the first successful result, or throw if none found
+        if (results.length > 0) {
+            return results[0];
+        }
+        
+        throw new Error(`No version information found for ${techName}`);
+    }
+    
+    getAPIOrderForTech(techName) {
+        // Define which APIs to try first based on technology type
+        const apiPriority = {
+            // Programming Languages - try EOL API first for official version info
+            'java': ['eol', 'github'],
+            'jdk': ['eol', 'github'],
+            'openjdk': ['eol', 'github'],
+            'oracle-jdk': ['eol', 'github'],
+            'python': ['eol', 'pypi'],
+            'node': ['eol', 'npm', 'github'],
+            'nodejs': ['eol', 'npm', 'github'],
+            'node.js': ['eol', 'npm', 'github'],
+            'go': ['eol', 'github'],
+            'golang': ['eol', 'github'],
+            'rust': ['eol', 'github'],
+            'php': ['eol', 'github'],
+            'ruby': ['eol', 'github'],
+            'dotnet': ['eol', 'github'],
+            '.net': ['eol', 'github'],
+            'csharp': ['eol', 'github'],
+            'c#': ['eol', 'github'],
+            
+            // Frontend frameworks - try EOL API first for version info
+            'react': ['eol', 'npm', 'github'],
+            'vue': ['eol', 'npm', 'github'],
+            'angular': ['eol', 'npm', 'github'],
+            'svelte': ['npm', 'github'],
+            'nextjs': ['eol', 'npm', 'github'],
+            'next.js': ['eol', 'npm', 'github'],
+            'nuxt': ['eol', 'npm', 'github'],
+            'typescript': ['npm', 'github'],
+            'webpack': ['npm', 'github'],
+            'vite': ['npm', 'github'],
+            'babel': ['npm', 'github'],
+            'eslint': ['npm', 'github'],
+            'prettier': ['npm', 'github'],
+            
+            // Backend frameworks - EOL API where available
+            'express': ['eol', 'npm', 'github'],
+            'fastapi': ['pypi', 'github'],
+            'django': ['eol', 'pypi', 'github'],
+            'flask': ['pypi', 'github'],
+            'spring': ['eol', 'github'],
+            'spring-boot': ['eol', 'github'],
+            'rails': ['eol', 'github'],
+            'laravel': ['eol', 'github'],
+            
+            // Databases and Infrastructure - EOL API first for official lifecycle info
+            'postgresql': ['eol', 'github'],
+            'postgres': ['eol', 'github'],
+            'mysql': ['eol', 'github'],
+            'mongodb': ['eol', 'github'],
+            'redis': ['eol', 'github'],
+            'elasticsearch': ['eol', 'github'],
+            'docker': ['eol', 'github'],
+            'kubernetes': ['eol', 'github'],
+            'k8s': ['eol', 'github'],
+            
+            // AWS Services - EOL API available
+            'eks': ['eol'],
+            'amazon-eks': ['eol'],
+            'aws-eks': ['eol'],
+            'rds': ['eol'],
+            'amazon-rds-postgresql': ['eol'],
+            'amazon-rds-mysql': ['eol'],
+            'amazon-rds-mariadb': ['eol'],
+            'aws-lambda': ['eol'],
+            'lambda': ['eol'],
+            
+            // Azure Services
+            'aks': ['eol'],
+            'azure-kubernetes-service': ['eol'],
+            'azure-devops-server': ['eol'],
+            
+            // Google Cloud Services
+            'gke': ['eol'],
+            'google-kubernetes-engine': ['eol'],
+            'docker': ['official', 'github'],
+            'kubernetes': ['official', 'github'],
+            'nginx': ['official', 'github'],
+            'apache': ['official', 'github']
+        };
+        
+        return apiPriority[techName] || ['npm', 'pypi', 'github', 'official'];
+    }
+    
+    async tryNpmAPI(techName) {
+        const url = `${this.apiEndpoints.npm}/${techName}/latest`;
+        console.log('📦 [NPM DEBUG] API Request:', {
+            url: url,
+            techName: techName
+        });
+        
+        const npmResponse = await fetch(url);
+        console.log('📦 [NPM DEBUG] API Response Status:', npmResponse.status, npmResponse.statusText);
+        
+        if (npmResponse.ok) {
+            const data = await npmResponse.json();
+            console.log('📦 [NPM DEBUG] API Response Data:', {
+                techName: techName,
+                version: data.version,
+                hasVersion: !!data.version
+            });
+            return {
+                latest: data.version,
+                url: `https://www.npmjs.com/package/${techName}`,
+                type: 'npm-package'
+            };
+        }
+        return null;
+    }
+    
+    async tryPyPIAPI(techName) {
+        const url = `${this.apiEndpoints.pypi}/${techName}/json`;
+        console.log('🐍 [PyPI DEBUG] API Request:', {
+            url: url,
+            techName: techName
+        });
+        
+        const pypiResponse = await fetch(url);
+        console.log('🐍 [PyPI DEBUG] API Response Status:', pypiResponse.status, pypiResponse.statusText);
+        
+        if (pypiResponse.ok) {
+            const data = await pypiResponse.json();
+            console.log('🐍 [PyPI DEBUG] API Response Data:', {
+                techName: techName,
+                version: data.info?.version,
+                hasInfo: !!data.info
+            });
+            return {
+                latest: data.info.version,
+                url: `https://pypi.org/project/${techName}/`,
+                type: 'python-package'
+            };
+        }
+        return null;
+    }
+    
+    async tryGitHubAPI(techName) {
+        const githubRepos = this.getCommonGitHubRepos(techName);
+        console.log('🐙 [GitHub DEBUG] Starting repo checks:', {
+            techName: techName,
+            repos: githubRepos
+        });
+        
+        for (const repo of githubRepos) {
+            try {
+                const url = `${this.apiEndpoints.versions}/${repo}/releases/latest`;
+                console.log('🐙 [GitHub DEBUG] API Request:', {
+                    url: url,
+                    techName: techName,
+                    repo: repo
+                });
+                
+                const githubResponse = await fetch(url);
+                console.log('🐙 [GitHub DEBUG] API Response Status:', {
+                    repo: repo,
+                    status: githubResponse.status,
+                    statusText: githubResponse.statusText
+                });
+                
+                if (githubResponse.ok) {
+                    const data = await githubResponse.json();
+                    console.log('🐙 [GitHub DEBUG] API Response Data:', {
+                        techName: techName,
+                        repo: repo,
+                        tagName: data.tag_name,
+                        cleanedVersion: data.tag_name?.replace(/^v/, '')
+                    });
                     return {
                         latest: data.tag_name.replace(/^v/, ''),
-                        url: `https://github.com/${knownTech.repo}/releases`
+                        url: `https://github.com/${repo}/releases`,
+                        type: 'github-release'
                     };
-
-                default:
-                    throw new Error('Unsupported API');
+                }
+            } catch (error) {
+                console.warn('🐙 [GitHub DEBUG] API Error:', {
+                    repo: repo,
+                    error: error.message
+                });
+                continue; // Try next repo
             }
-        } catch (error) {
-            // Fallback to static version if available
-            if (knownTech.staticVersion) {
-                return {
-                    latest: knownTech.staticVersion,
-                    url: knownTech.checkUrl || `https://www.google.com/search?q=${encodeURIComponent(techName + ' latest version')}`
-                };
+        }
+        return null;
+    }
+    
+    async tryOfficialSources(techName) {
+        // Only use real API data - no hardcoded versions
+        // This method now serves as a placeholder for future official API integrations
+        return null;
+    }
+    
+    async tryEOLAPI(techName) {
+        try {
+            const normalizedName = techName.toLowerCase();
+            
+            // Map language, framework, and infrastructure variants to their EOL API names
+            const eolApiMapping = {
+                // Programming Languages
+                'java': 'oracle-jdk',
+                'jdk': 'oracle-jdk', 
+                'openjdk': 'openjdk-builds-from-oracle',
+                'oracle-jdk': 'oracle-jdk',
+                'python': 'python',
+                'node': 'nodejs',
+                'nodejs': 'nodejs', 
+                'node.js': 'nodejs',
+                'go': 'go',
+                'golang': 'go',
+                'rust': 'rust',
+                'php': 'php',
+                'ruby': 'ruby',
+                'dotnet': 'dotnet',
+                '.net': 'dotnet',
+                'csharp': 'dotnet',
+                'c#': 'dotnet',
+                // Frontend Frameworks
+                'react': 'react',
+                'vue': 'vue',
+                'angular': 'angular',
+                'nextjs': 'nextjs',
+                'next.js': 'nextjs',
+                'nuxt': 'nuxt',
+                // Backend Frameworks
+                'express': 'express',
+                'django': 'django',
+                'spring': 'spring-framework',
+                'spring-boot': 'spring-boot',
+                'rails': 'rails',
+                'laravel': 'laravel',
+                // Databases
+                'postgresql': 'postgresql',
+                'postgres': 'postgresql',
+                'mysql': 'mysql',
+                'mongodb': 'mongodb',
+                'redis': 'redis',
+                'elasticsearch': 'elasticsearch',
+                // Container & Orchestration
+                'docker': 'docker-engine',
+                'kubernetes': 'kubernetes',
+                'k8s': 'kubernetes',
+                // AWS Services
+                'eks': 'amazon-eks',
+                'amazon-eks': 'amazon-eks',
+                'aws-eks': 'amazon-eks',
+                'rds': 'amazon-rds-postgresql',
+                'amazon-rds-postgresql': 'amazon-rds-postgresql',
+                'amazon-rds-mysql': 'amazon-rds-mysql', 
+                'amazon-rds-mariadb': 'amazon-rds-mariadb',
+                'aws-lambda': 'aws-lambda',
+                'lambda': 'aws-lambda',
+                // Azure Services
+                'aks': 'azure-kubernetes-service',
+                'azure-kubernetes-service': 'azure-kubernetes-service',
+                'azure-devops-server': 'azure-devops-server',
+                // Google Cloud Services
+                'gke': 'google-kubernetes-engine',
+                'google-kubernetes-engine': 'google-kubernetes-engine'
+            };
+            
+            const apiName = eolApiMapping[normalizedName] || normalizedName;
+            const url = `${this.apiEndpoints.endoflife}/${apiName}.json`;
+            
+            console.log('📅 [EOL DEBUG] API Request:', {
+                url: url,
+                techName: techName,
+                normalizedName: normalizedName,
+                apiName: apiName
+            });
+            
+            const response = await fetch(url);
+            console.log('📅 [EOL DEBUG] API Response Status:', {
+                techName: techName,
+                status: response.status,
+                ok: response.ok,
+                statusText: response.statusText
+            });
+            
+            if (!response.ok) {
+                return null;
             }
             
-            // Final fallback: try to get info from GitHub if repo is available
-            if (knownTech.repo) {
-                try {
-                    const url = `${this.apiEndpoints.versions}/${knownTech.repo}/releases/latest`;
-                    const response = await fetch(url);
-                    if (response.ok) {
-                        const data = await response.json();
-                        return {
-                            latest: data.tag_name.replace(/^v/, ''),
-                            url: `https://github.com/${knownTech.repo}/releases`
-                        };
-                    }
-                } catch (fallbackError) {
-                    console.warn('GitHub fallback failed:', fallbackError);
+            const data = await response.json();
+            console.log('📅 [EOL DEBUG] API Response Data:', {
+                techName: techName,
+                apiName: apiName,
+                isArray: Array.isArray(data),
+                dataLength: Array.isArray(data) ? data.length : 'not array',
+                firstItem: Array.isArray(data) && data.length > 0 ? data[0] : null
+            });
+            
+            if (!Array.isArray(data) || data.length === 0) {
+                return null;
+            }
+            
+            // Get the latest version info
+            const latest = data[0];
+            
+            const result = {
+                latest: latest.latest || latest.cycle,
+                releaseDate: latest.latestReleaseDate || latest.releaseDate,
+                isSecure: latest.eol ? new Date(latest.eol) > new Date() : true,
+                eolInfo: {
+                    eol: latest.eol,
+                    support: latest.support,
+                    lts: latest.lts,
+                    cycle: latest.cycle
+                }
+            };
+            
+            console.log('📅 [EOL DEBUG] Processed Result:', {
+                techName: techName,
+                result: result
+            });
+            
+            return result;
+        } catch (error) {
+            console.warn(`EOL API check failed for ${techName}:`, error);
+            return null;
+        }
+    }
+    
+    getEOLApiName(normalizedName) {
+        // Check cached discoveries first
+        const cached = this.getCachedEOLMappings();
+        if (cached[normalizedName]) {
+            return cached[normalizedName];
+        }
+        
+        // Static mappings for known technologies
+        const eolApiMapping = {
+            // Programming Languages
+            'java': 'oracle-jdk',
+            'jdk': 'oracle-jdk', 
+            'openjdk': 'openjdk-builds-from-oracle',
+            'oracle-jdk': 'oracle-jdk',
+            'python': 'python',
+            'node': 'nodejs',
+            'nodejs': 'nodejs', 
+            'node.js': 'nodejs',
+            'go': 'go',
+            'golang': 'go',
+            'rust': 'rust',
+            'php': 'php',
+            'ruby': 'ruby',
+            'dotnet': 'dotnet',
+            '.net': 'dotnet',
+            'csharp': 'dotnet',
+            'c#': 'dotnet',
+            // Frontend Frameworks
+            'react': 'react',
+            'vue': 'vue',
+            'angular': 'angular',
+            'nextjs': 'nextjs',
+            'next.js': 'nextjs',
+            'nuxt': 'nuxt',
+            // Backend Frameworks
+            'express': 'express',
+            'django': 'django',
+            'spring': 'spring-framework',
+            'spring-boot': 'spring-boot',
+            'rails': 'rails',
+            'laravel': 'laravel',
+            // Databases
+            'postgresql': 'postgresql',
+            'postgres': 'postgresql',
+            'mysql': 'mysql',
+            'mongodb': 'mongodb',
+            'redis': 'redis',
+            'elasticsearch': 'elasticsearch',
+            // Container & Orchestration
+            'docker': 'docker-engine',
+            'kubernetes': 'kubernetes',
+            'k8s': 'kubernetes',
+            // AWS Services
+            'eks': 'amazon-eks',
+            'amazon-eks': 'amazon-eks',
+            'aws-eks': 'amazon-eks',
+            'rds': 'amazon-rds-postgresql',
+            'amazon-rds-postgresql': 'amazon-rds-postgresql',
+            'amazon-rds-mysql': 'amazon-rds-mysql', 
+            'amazon-rds-mariadb': 'amazon-rds-mariadb',
+            'aws-lambda': 'aws-lambda',
+            'lambda': 'aws-lambda',
+            // Azure Services
+            'aks': 'azure-kubernetes-service',
+            'azure-kubernetes-service': 'azure-kubernetes-service',
+            'azure-devops-server': 'azure-devops-server',
+            // Google Cloud Services
+            'gke': 'google-kubernetes-engine',
+            'google-kubernetes-engine': 'google-kubernetes-engine'
+        };
+        
+        return eolApiMapping[normalizedName];
+    }
+    
+    async discoverEOLApiName(techName) {
+        try {
+            console.log(`🔍 Auto-discovering EOL API for: ${techName}`);
+            
+            // Show discovery status to user
+            this.showDiscoveryStatus(techName);
+            
+            // Strategy 1: Try exact name
+            const exactMatch = await this.testEOLEndpoint(techName);
+            if (exactMatch) {
+                console.log(`✅ Found exact match: ${techName}`);
+                this.hideDiscoveryStatus();
+                return techName;
+            }
+            
+            // Strategy 2: Try common variations
+            const variations = this.generateNameVariations(techName);
+            for (const variation of variations) {
+                const match = await this.testEOLEndpoint(variation);
+                if (match) {
+                    console.log(`✅ Found variation match: ${variation} for ${techName}`);
+                    this.hideDiscoveryStatus();
+                    return variation;
                 }
             }
+            
+            // Strategy 3: Try fuzzy matching against all available APIs
+            const fuzzyMatch = await this.findFuzzyMatch(techName);
+            if (fuzzyMatch) {
+                console.log(`✅ Found fuzzy match: ${fuzzyMatch} for ${techName}`);
+                this.hideDiscoveryStatus();
+                return fuzzyMatch;
+            }
+            
+            console.log(`❌ No EOL API found for: ${techName}`);
+            this.hideDiscoveryStatus();
+            return null;
+        } catch (error) {
+            console.warn(`EOL discovery failed for ${techName}:`, error);
+            this.hideDiscoveryStatus();
+            return null;
+        }
+    }
+    
+    async testEOLEndpoint(apiName) {
+        try {
+            const url = `${this.apiEndpoints.endoflife}/${apiName}.json`;
+            console.log('🧪 [EOL DEBUG] Testing endpoint:', url);
+            
+            const response = await fetch(url);
+            console.log('🧪 [EOL DEBUG] Test result:', {
+                apiName: apiName,
+                status: response.status,
+                ok: response.ok
+            });
+            
+            return response.ok;
+        } catch (error) {
+            console.log('🧪 [EOL DEBUG] Test failed:', {
+                apiName: apiName,
+                error: error.message
+            });
+            return false;
+        }
+    }
+    
+    generateNameVariations(techName) {
+        const variations = [];
+        const name = techName.toLowerCase();
+        
+        // Common patterns
+        variations.push(
+            name,
+            name.replace(/\.js$/, ''),
+            name.replace(/^aws-/, 'amazon-'),
+            name.replace(/^amazon-/, 'aws-'),
+            name.replace(/-/g, ''),
+            name.replace(/\s+/g, '-'),
+            `${name}-framework`,
+            `${name}-js`,
+            `${name}-lang`,
+            `${name}-language`
+        );
+        
+        return [...new Set(variations)];
+    }
+    
+    async findFuzzyMatch(techName) {
+        try {
+            // Get all available APIs
+            const allApis = await this.getAllEOLApis();
+            
+            // Simple fuzzy matching
+            const matches = allApis.filter(api => 
+                api.includes(techName.toLowerCase()) || 
+                techName.toLowerCase().includes(api) ||
+                this.calculateSimilarity(api, techName.toLowerCase()) > 0.7
+            );
+            
+            return matches.length > 0 ? matches[0] : null;
+        } catch (error) {
+            console.warn('Fuzzy matching failed:', error);
+            return null;
+        }
+    }
+    
+    async getAllEOLApis() {
+        try {
+            // Cache the API list for 1 hour
+            const cached = localStorage.getItem('eol-apis-cache');
+            const cacheTime = localStorage.getItem('eol-apis-cache-time');
+            
+            if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 3600000) {
+                return JSON.parse(cached);
+            }
+            
+            const response = await fetch(`${this.apiEndpoints.endoflife}/all.json`);
+            const apis = await response.json();
+            
+            localStorage.setItem('eol-apis-cache', JSON.stringify(apis));
+            localStorage.setItem('eol-apis-cache-time', Date.now().toString());
+            
+            return apis;
+        } catch (error) {
+            console.warn('Failed to get all EOL APIs:', error);
+            return [];
+        }
+    }
+    
+    calculateSimilarity(str1, str2) {
+        const longer = str1.length > str2.length ? str1 : str2;
+        const shorter = str1.length > str2.length ? str2 : str1;
+        
+        if (longer.length === 0) return 1.0;
+        
+        const editDistance = this.levenshteinDistance(longer, shorter);
+        return (longer.length - editDistance) / longer.length;
+    }
+    
+    levenshteinDistance(str1, str2) {
+        const matrix = [];
+        
+        for (let i = 0; i <= str2.length; i++) {
+            matrix[i] = [i];
+        }
+        
+        for (let j = 0; j <= str1.length; j++) {
+            matrix[0][j] = j;
+        }
+        
+        for (let i = 1; i <= str2.length; i++) {
+            for (let j = 1; j <= str1.length; j++) {
+                if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1,
+                        matrix[i][j - 1] + 1,
+                        matrix[i - 1][j] + 1
+                    );
+                }
+            }
+        }
+        
+        return matrix[str2.length][str1.length];
+    }
+    
+    cacheEOLMapping(techName, apiName) {
+        const cached = this.getCachedEOLMappings();
+        cached[techName] = apiName;
+        localStorage.setItem('discovered-eol-mappings', JSON.stringify(cached));
+        console.log(`💾 Cached EOL mapping: ${techName} → ${apiName}`);
+    }
+    
+    getCachedEOLMappings() {
+        try {
+            const cached = localStorage.getItem('discovered-eol-mappings');
+            return cached ? JSON.parse(cached) : {};
+        } catch {
+            return {};
+        }
+    }
+    
+    showDiscoveryStatus(techName) {
+        // Create or update discovery status indicator
+        let statusEl = document.getElementById('discovery-status');
+        if (!statusEl) {
+            statusEl = document.createElement('div');
+            statusEl.id = 'discovery-status';
+            statusEl.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: var(--ai-gradient);
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: var(--shadow-lg);
+                z-index: 1000;
+                font-size: 0.9rem;
+                animation: pulse 1.5s infinite;
+            `;
+            document.body.appendChild(statusEl);
+        }
+        statusEl.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div style="width: 16px; height: 16px; border: 2px solid white; border-top-color: transparent; border-radius: 50%; animation: spin 1s infinite linear;"></div>
+                <span>🔍 Discovering ${techName} lifecycle data...</span>
+            </div>
+        `;
+        statusEl.style.display = 'block';
+    }
+    
+    hideDiscoveryStatus() {
+        const statusEl = document.getElementById('discovery-status');
+        if (statusEl) {
+            statusEl.style.display = 'none';
+        }
+    }
+    
+    showMessage(message, type = 'info') {
+        const messageEl = document.createElement('div');
+        messageEl.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.9rem;
+            z-index: 1001;
+            animation: slideIn 0.3s ease;
+            background: ${
+                type === 'success' ? '#10b981' :
+                type === 'error' ? '#ef4444' :
+                type === 'warning' ? '#f59e0b' :
+                '#3b82f6'
+            };
+        `;
+        messageEl.textContent = message;
+        document.body.appendChild(messageEl);
+        
+        setTimeout(() => {
+            messageEl.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => messageEl.remove(), 300);
+        }, 3000);
+    }
+    
+    async generateOllamaUpgradePlan(tech) {
+        try {
+            const prompt = `You are an expert software architect analyzing upgrade requirements for ${tech.technology}.
+
+Current Status:
+- Technology: ${tech.technology}
+- Current Version: ${tech.version || 'Unknown'}
+- Latest Available: ${tech.latest || 'Unknown'}
+- EOL Status: ${tech.eolInfo ? JSON.stringify(tech.eolInfo) : 'No EOL data'}
+- Security Status: ${tech.isSecure ? 'Secure' : 'Potentially vulnerable'}
+
+CRITICAL VERSION RULES:
+- ONLY use the Current Version (${tech.version || 'Unknown'}) and Latest Available (${tech.latest || 'Unknown'}) provided above
+- NEVER suggest version numbers not mentioned in this data
+- If Latest Available is "Unknown", focus on general maintenance and security practices
+- Always recommend upgrading to newer versions, never downgrades
+
+CRITICAL RESPONSE FORMAT RULES:
+- Return ONLY ONE JSON object, no explanatory text
+- Do not include multiple JSON objects
+- Do not include text before or after the JSON
+- Do not use numbered lists (1., 2., 3.) inside JSON arrays
+- Use proper JSON array format with comma-separated quoted strings
+
+For Frontend Frameworks (React, Vue, Angular):
+- Consider breaking changes between major versions
+- Plan for dependency compatibility issues (libraries, build tools, testing frameworks)
+- Address potential component API changes and lifecycle method updates
+- Plan gradual migration strategies for large applications
+- Consider codemods and automated migration tools when available
+
+For Backend Frameworks (Express, Django, Spring):
+- Review middleware and plugin compatibility
+- Consider database migration requirements
+- Plan for API endpoint changes and request/response format updates
+- Address security configuration updates
+
+For Languages/Runtimes (Node.js, Python, Java):
+- Consider syntax and feature changes
+- Plan for tooling and IDE support updates
+- Address package manager and build system changes
+- Review performance implications and optimization opportunities
+
+Return EXACTLY this JSON structure with NO additional text:
+
+{
+  "priority": "critical|high|medium|low",
+  "recommendation": "Brief recommendation with specific version guidance",
+  "targetVersion": "Use ONLY the Latest Available version provided above",
+  "timeline": "Suggested timeline (e.g. 'Within 1 week', 'Next quarter')",
+  "effort": "low|medium|high",
+  "risks": ["risk1", "risk2", "risk3"],
+  "benefits": ["benefit1", "benefit2", "benefit3"],
+  "steps": ["step1", "step2", "step3", "step4"],
+  "testingRequired": ["test1", "test2"],
+  "rollbackPlan": "Rollback strategy appropriate for this technology",
+  "dependencies": ["dependency1", "dependency2"]
+}
+
+Focus on practical, actionable advice. Consider security implications, breaking changes, and business impact specific to ${tech.technology}.
+
+IMPORTANT: Return ONLY the JSON object above, no other text.`;
+
+            const requestPayload = {
+                model: this.localAI.defaultModel,
+                prompt: prompt,
+                stream: false
+            };
+
+            console.log('🤖 [AI DEBUG] Ollama Upgrade Plan Request:', {
+                url: 'http://localhost:11434/api/generate',
+                method: 'POST',
+                payload: requestPayload,
+                technology: tech.technology
+            });
+
+            const response = await fetch('http://localhost:11434/api/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestPayload)
+            });
+
+            console.log('🤖 [AI DEBUG] Ollama Upgrade Plan Response Status:', response.status, response.statusText);
+
+            if (!response.ok) {
+                throw new Error(`Ollama API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('🤖 [AI DEBUG] Ollama Upgrade Plan Response Data:', {
+                technology: tech.technology,
+                responseLength: data.response?.length || 0,
+                response: data.response
+            });
+            
+            return this.parseUpgradePlan(data.response);
+        } catch (error) {
+            console.error('Upgrade plan generation failed:', error);
             throw error;
         }
     }
-
-    async fetchEOLInfo(eolTech, knownTech, currentVersion) {
-        // First try static EOL data with version-specific logic
-        if (knownTech && currentVersion) {
-            const versionSpecificEOL = this.getVersionSpecificEOL(knownTech, currentVersion);
-            if (versionSpecificEOL) {
-                return versionSpecificEOL;
+    
+    // Helper method to clean up numbered list syntax in JSON arrays
+    cleanJsonArrays(jsonStr) {
+        // Remove numbered list format like "1. ", "2. ", etc. from array items
+        // First pass: fix array start with numbered items
+        jsonStr = jsonStr.replace(/(\[\s*)\s*(\d+)\.\s+"([^"]*?)"/g, '$1"$3"');
+        
+        // Second pass: fix subsequent array items with numbered format
+        jsonStr = jsonStr.replace(/,\s*(\d+)\.\s+"([^"]*?)"/g, ', "$2"');
+        
+        // Third pass: handle any remaining standalone numbered items in arrays
+        jsonStr = jsonStr.replace(/(\[\s*[^"]*"[^"]*",?\s*)\s*(\d+)\.\s+([^",\]]+)/g, '$1"$3"');
+        
+        return jsonStr;
+    }
+    
+    parseUpgradePlan(response) {
+        try {
+            console.log('🤖 [AI DEBUG] Parsing upgrade plan response:', response.substring(0, 500) + '...');
+            
+            // Strategy 1: Find the first complete JSON object
+            const jsonMatch = response.match(/\{[^}]*(?:\{[^}]*\}[^}]*)*\}/g);
+            if (jsonMatch) {
+                // Try each potential JSON object
+                for (const match of jsonMatch) {
+                    try {
+                        // Clean up common formatting issues
+                        let cleanMatch = match
+                            .replace(/(\[\s*)\d+\.\s+"/g, '$1"')  // Remove "1. " from array items
+                            .replace(/",\s*\d+\.\s+"/g, '", "')   // Remove "2. " from middle items
+                            .replace(/"\s*\]/g, '"]')            // Clean up array endings
+                            .replace(/\n/g, ' ')                 // Remove newlines
+                            .replace(/\s+/g, ' ')                // Normalize whitespace
+                            .trim();
+                        
+                        console.log('🤖 [AI DEBUG] Attempting to parse JSON:', cleanMatch.substring(0, 200) + '...');
+                        
+                        const parsed = JSON.parse(cleanMatch);
+                        if (parsed && typeof parsed === 'object' && parsed.priority && parsed.recommendation) {
+                            console.log('🤖 [AI DEBUG] Successfully parsed upgrade plan JSON');
+                            return parsed;
+                        }
+                    } catch (e) {
+                        console.warn('🤖 [AI DEBUG] Failed to parse JSON match:', e.message);
+                        continue;
+                    }
+                }
             }
-        }
-
-        // Fallback to general static EOL data if available
-        if (knownTech && knownTech.staticEol) {
+            
+            // Strategy 2: Try to extract JSON between code blocks
+            const codeBlockMatch = response.match(/```(?:json)?\s*({[\s\S]*?})\s*```/i);
+            if (codeBlockMatch) {
+                try {
+                    let jsonStr = codeBlockMatch[1];
+                    jsonStr = this.cleanJsonArrays(jsonStr);
+                    console.log('🤖 [AI DEBUG] Attempting to parse code block JSON');
+                    return JSON.parse(jsonStr);
+                } catch (e) {
+                    console.warn('🤖 [AI DEBUG] Failed to parse code block JSON:', e.message);
+                }
+            }
+            
+            // Strategy 3: Look for JSON after any introductory text
+            const lines = response.split('\n');
+            let jsonStartIndex = -1;
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].trim().startsWith('{')) {
+                    jsonStartIndex = i;
+                    break;
+                }
+            }
+            
+            if (jsonStartIndex >= 0) {
+                const jsonLines = lines.slice(jsonStartIndex);
+                let jsonStr = jsonLines.join('\n');
+                
+                // Find the end of the JSON object
+                let braceCount = 0;
+                let endIndex = -1;
+                for (let i = 0; i < jsonStr.length; i++) {
+                    if (jsonStr[i] === '{') braceCount++;
+                    if (jsonStr[i] === '}') {
+                        braceCount--;
+                        if (braceCount === 0) {
+                            endIndex = i + 1;
+                            break;
+                        }
+                    }
+                }
+                
+                if (endIndex > 0) {
+                    jsonStr = jsonStr.substring(0, endIndex);
+                    try {
+                        jsonStr = this.cleanJsonArrays(jsonStr);
+                        console.log('🤖 [AI DEBUG] Attempting to parse extracted JSON');
+                        return JSON.parse(jsonStr);
+                    } catch (e) {
+                        console.warn('🤖 [AI DEBUG] Failed to parse extracted JSON:', e.message);
+                    }
+                }
+            }
+            
+            throw new Error('No valid JSON found in response');
+        } catch (error) {
+            console.error('🤖 [AI DEBUG] Failed to parse upgrade plan:', error.message);
+            console.error('🤖 [AI DEBUG] Response was:', response);
             return {
-                eol: knownTech.staticEol,
-                support: knownTech.staticSupportEnd || 'See EOL date',
-                lts: knownTech.ltsVersion || false,
-                source: 'static'
+                priority: 'medium',
+                recommendation: 'Review and plan upgrade when convenient',
+                targetVersion: 'Latest stable version',
+                timeline: 'Next maintenance window',
+                effort: 'medium',
+                risks: ['Potential compatibility issues'],
+                benefits: ['Security improvements', 'New features'],
+                steps: ['Review release notes', 'Test in staging', 'Deploy to production'],
+                testingRequired: ['Unit tests', 'Integration tests'],
+                rollbackPlan: 'Keep previous version available for quick rollback',
+                dependencies: ['Review dependent packages']
             };
         }
+    }
+    
+    displayUpgradePlanError(modal, tech, errorMessage) {
+        const content = modal.querySelector('.modal-content');
+        content.innerHTML = `
+            <div class="modal-header">
+                <h3>❌ Upgrade Plan Error</h3>
+                <span class="close-modal" onclick="aiManager.closeModal(this)">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="error-container">
+                    <div class="error-icon">⚠️</div>
+                    <div class="error-content">
+                        <h4>Failed to Generate Upgrade Plan for ${this.escapeHtml(tech.technology)}</h4>
+                        <p class="error-message">${this.escapeHtml(errorMessage)}</p>
+                        <div class="error-suggestions">
+                            <h5>Suggestions:</h5>
+                            <ul>
+                                <li>Ensure Ollama is running on localhost:11434</li>
+                                <li>Check if the ${this.localAI.defaultModel} model is available</li>
+                                <li>Verify your internet connection</li>
+                                <li>Try again in a few moments</li>
+                            </ul>
+                        </div>
+                        <div class="error-actions">
+                            <button class="retry-btn" onclick="aiManager.showDetailedUpgradePlan('${tech.technology}')">
+                                <i class="fas fa-redo"></i> Retry
+                            </button>
+                            <button class="close-btn" onclick="aiManager.closeModal(this)">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    displayUpgradePlan(modal, plan, tech) {
+        const content = modal.querySelector('.modal-content');
+        
+        content.innerHTML = `
+            <div class="modal-header">
+                <h3>🚀 Upgrade Plan: ${this.escapeHtml(tech.technology)}</h3>
+                <span class="close-modal" onclick="aiManager.closeModal(this)">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="upgrade-plan-container">
+                    <div class="upgrade-summary">
+                        <div class="upgrade-info">
+                            <span class="current-version">Current: ${this.escapeHtml(tech.version || 'Unknown')}</span>
+                            <i class="fas fa-arrow-right"></i>
+                            <span class="target-version">Target: ${this.escapeHtml(plan.targetVersion || 'Latest')}</span>
+                        </div>
+                        <div class="priority-badge priority-${plan.priority || 'medium'}">
+                            ${(plan.priority || 'medium').toUpperCase()} Priority
+                        </div>
+                    </div>
+                    
+                    <div class="plan-overview">
+                        <h4>📋 Recommendation</h4>
+                        <p class="recommendation">${this.escapeHtml(plan.recommendation || 'No specific recommendation provided.')}</p>
+                        
+                        <div class="plan-meta">
+                            <div class="meta-item">
+                                <span class="meta-label">Timeline:</span>
+                                <span class="meta-value">${this.escapeHtml(plan.timeline || 'Not specified')}</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Effort Level:</span>
+                                <span class="meta-value effort-${(plan.effort || 'medium')}">${(plan.effort || 'medium').toUpperCase()}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="plan-section">
+                        <h4>🔧 Upgrade Steps</h4>
+                        <ol class="upgrade-steps">
+                            ${(plan.steps || []).map(step => `<li>${this.escapeHtml(step)}</li>`).join('')}
+                        </ol>
+                    </div>
+                    
+                    <div class="plan-section">
+                        <h4>⚠️ Risks & Considerations</h4>
+                        <ul class="risk-list">
+                            ${(plan.risks || []).map(risk => `<li>${this.escapeHtml(risk)}</li>`).join('')}
+                        </ul>
+                    </div>
+                    
+                    <div class="plan-section">
+                        <h4>✅ Benefits</h4>
+                        <ul class="benefits-list">
+                            ${(plan.benefits || []).map(benefit => `<li>${this.escapeHtml(benefit)}</li>`).join('')}
+                        </ul>
+                    </div>
+                    
+                    <div class="plan-section">
+                        <h4>🧪 Testing Required</h4>
+                        <ul class="testing-list">
+                            ${(plan.testingRequired || []).map(test => `<li>${this.escapeHtml(test)}</li>`).join('')}
+                        </ul>
+                    </div>
+                    
+                    <div class="plan-section">
+                        <h4>🔄 Rollback Plan</h4>
+                        <p class="rollback-plan">${this.escapeHtml(plan.rollbackPlan || 'Standard rollback procedures apply.')}</p>
+                    </div>
+                    
+                    <div class="plan-section">
+                        <h4>📦 Dependencies</h4>
+                        <ul class="dependencies-list">
+                            ${(plan.dependencies || []).map(dep => `<li>${this.escapeHtml(dep)}</li>`).join('')}
+                        </ul>
+                    </div>
+                    
+                    <div class="plan-actions">
+                        <button class="btn-primary" onclick="aiManager.exportUpgradePlan('${tech.technology}', ${JSON.stringify(plan).replace(/'/g, '&apos;')})">
+                            <i class="fas fa-download"></i> Export Plan
+                        </button>
+                        <button class="btn-secondary" onclick="aiManager.closeModal(this)">
+                            <i class="fas fa-times"></i> Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    exportUpgradePlan(techName, plan) {
+        const exportData = {
+            technology: techName,
+            exportDate: new Date().toISOString(),
+            plan: plan
+        };
+        
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${techName}-upgrade-plan-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        this.showMessage(`Upgrade plan for ${techName} exported successfully`, 'success');
+    }
 
-        // Try the endoflife.date API
+    displayNoAIUpgradePlan(modal, tech) {
+        const content = modal.querySelector('.modal-content');
+        content.innerHTML = `
+            <div class="modal-header">
+                <h3>🤖 AI Upgrade Plan: ${this.escapeHtml(tech.technology)}</h3>
+                <span class="close-modal" onclick="aiManager.closeModal(this)">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="ai-unavailable">
+                    <div class="ai-status">
+                        <i class="fas fa-robot"></i>
+                        <h4>AI Analysis Unavailable</h4>
+                        <p>Ollama AI is not running or not configured. Please:</p>
+                    </div>
+                    
+                    <div class="setup-instructions">
+                        <h5>🔧 Setup Instructions:</h5>
+                        <ol>
+                            <li>Install Ollama from <a href="https://ollama.ai" target="_blank">ollama.ai</a></li>
+                            <li>Run: <code>ollama pull llama3.2:3b</code></li>
+                            <li>Start Ollama service</li>
+                            <li>Refresh this page and try again</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="basic-guidance">
+                        <h5>📋 Basic Upgrade Guidance for ${this.escapeHtml(tech.technology)}:</h5>
+                        <div class="guidance-content">
+                            <p><strong>Current:</strong> ${this.escapeHtml(tech.version || 'Unknown')}</p>
+                            <p><strong>Latest:</strong> ${this.escapeHtml(tech.latestVersion || 'Check official website')}</p>
+                            
+                            <div class="general-steps">
+                                <h6>General Steps:</h6>
+                                <ul>
+                                    <li>Review release notes and breaking changes</li>
+                                    <li>Update dependencies and check compatibility</li>
+                                    <li>Test thoroughly in staging environment</li>
+                                    <li>Plan rollback strategy</li>
+                                    <li>Schedule upgrade during maintenance window</li>
+                                    <li>Monitor system after upgrade</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="error-actions">
+                        <button class="retry-btn" onclick="location.reload()">
+                            <i class="fas fa-redo"></i> Retry with AI
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    getCommonGitHubRepos(techName) {
+        const repoMap = {
+            'react': ['facebook/react'],
+            'vue': ['vuejs/vue', 'vuejs/core'],
+            'angular': ['angular/angular'],
+            'svelte': ['sveltejs/svelte'],
+            'nextjs': ['vercel/next.js'],
+            'next.js': ['vercel/next.js'],
+            'nuxt': ['nuxt/nuxt'],
+            'express': ['expressjs/express'],
+            'fastapi': ['tiangolo/fastapi'],
+            'django': ['django/django'],
+            'flask': ['pallets/flask'],
+            'nodejs': ['nodejs/node'],
+            'node.js': ['nodejs/node'],
+            'typescript': ['microsoft/TypeScript'],
+            'webpack': ['webpack/webpack'],
+            'vite': ['vitejs/vite'],
+            'docker': ['docker/cli', 'moby/moby'],
+            'kubernetes': ['kubernetes/kubernetes'],
+            'redis': ['redis/redis'],
+            'nginx': ['nginx/nginx'],
+            'postgresql': ['postgres/postgres'],
+            'mongodb': ['mongodb/mongo'],
+            'elasticsearch': ['elastic/elasticsearch']
+        };
+        
+        return repoMap[techName] || [];
+    }
+    
+    async fetchEOLFromAPIs(techName, currentVersion) {
+        const normalizedName = techName.toLowerCase();
+        
+        // Map language, framework, and infrastructure variants to their EOL API names
+        const eolApiMapping = {
+            // Programming Languages
+            'java': 'oracle-jdk',
+            'jdk': 'oracle-jdk', 
+            'openjdk': 'openjdk-builds-from-oracle',
+            'oracle-jdk': 'oracle-jdk',
+            'python': 'python',
+            'node': 'nodejs',
+            'nodejs': 'nodejs', 
+            'node.js': 'nodejs',
+            'go': 'go',
+            'golang': 'go',
+            'rust': 'rust',
+            'php': 'php',
+            'ruby': 'ruby',
+            'dotnet': 'dotnet',
+            '.net': 'dotnet',
+            'csharp': 'dotnet',
+            'c#': 'dotnet',
+            // Frontend Frameworks
+            'react': 'react',
+            'vue': 'vue',
+            'angular': 'angular',
+            'nextjs': 'nextjs',
+            'next.js': 'nextjs',
+            'nuxt': 'nuxt',
+            // Backend Frameworks
+            'express': 'express',
+            'django': 'django',
+            'spring': 'spring-framework',
+            'spring-boot': 'spring-boot',
+            'rails': 'rails',
+            'laravel': 'laravel',
+            // Databases
+            'postgresql': 'postgresql',
+            'postgres': 'postgresql',
+            'mysql': 'mysql',
+            'mongodb': 'mongodb',
+            'redis': 'redis',
+            'elasticsearch': 'elasticsearch',
+            // Container & Orchestration
+            'docker': 'docker-engine',
+            'kubernetes': 'kubernetes',
+            'k8s': 'kubernetes',
+            // AWS Services
+            'eks': 'amazon-eks',
+            'amazon-eks': 'amazon-eks',
+            'aws-eks': 'amazon-eks',
+            'rds': 'amazon-rds-postgresql',
+            'amazon-rds-postgresql': 'amazon-rds-postgresql',
+            'amazon-rds-mysql': 'amazon-rds-mysql', 
+            'amazon-rds-mariadb': 'amazon-rds-mariadb',
+            'aws-lambda': 'aws-lambda',
+            'lambda': 'aws-lambda',
+            // Azure Services
+            'aks': 'azure-kubernetes-service',
+            'azure-kubernetes-service': 'azure-kubernetes-service',
+            'azure-devops-server': 'azure-devops-server',
+            // Google Cloud Services
+            'gke': 'google-kubernetes-engine',
+            'google-kubernetes-engine': 'google-kubernetes-engine'
+        };
+        
+        const apiName = eolApiMapping[normalizedName] || normalizedName;
+        
+        // Try endoflife.date API
         try {
-            const response = await fetch(`${this.apiEndpoints.endoflife}/${eolTech}.json`);
-            
+            const url = `${this.apiEndpoints.endoflife}/${apiName}.json`;
+            console.log('📅 [EOL DEBUG] API Request:', {
+                url: url,
+                techName: techName,
+                apiName: apiName,
+                currentVersion: currentVersion
+            });
+
+            const response = await fetch(url);
+            console.log('📅 [EOL DEBUG] API Response Status:', response.status, response.statusText);
+
             if (response.ok) {
                 const data = await response.json();
+                console.log('📅 [EOL DEBUG] API Response Data:', {
+                    techName: techName,
+                    dataLength: Array.isArray(data) ? data.length : 'not array',
+                    firstFewItems: Array.isArray(data) ? data.slice(0, 3) : data
+                });
                 
                 if (Array.isArray(data) && data.length > 0) {
-                    // Try to find the specific version
+                    // Try to find specific version
                     let versionData = null;
                     if (currentVersion) {
                         const majorVersion = this.extractMajorVersion(currentVersion);
-                        versionData = data.find(v => 
-                            v.cycle == majorVersion || 
-                            v.cycle == currentVersion ||
-                            v.latest?.includes(majorVersion)
-                        );
+                        console.log(`Looking for EOL data for ${techName} version ${currentVersion}, major: ${majorVersion}`);
+                        
+                        versionData = data.find(v => {
+                            const match = v.cycle == majorVersion || 
+                                         v.cycle == currentVersion ||
+                                         (v.latest && v.latest.startsWith(majorVersion + '.'));
+                            if (match) {
+                                console.log(`Matched cycle ${v.cycle} for version ${currentVersion} (major: ${majorVersion})`);
+                            }
+                            return match;
+                        });
+                        
+                        console.log(`Found version data:`, versionData);
+                        console.log(`Available cycles:`, data.map(d => d.cycle));
                     }
                     
-                    // Fallback to latest if specific version not found
-                    const targetData = versionData || data[0];
+                    // Only fallback to latest if no specific version found AND no current version specified
+                    const targetData = versionData || (!currentVersion ? data[0] : null);
                     
-                    return {
+                    if (!targetData) {
+                        console.warn(`No EOL data found for ${techName} version ${currentVersion || 'any'}`);
+                        return null;
+                    }
+                    
+                    // Find any field containing "support" with a date value
+                    const getSupportDate = (data) => {
+                        for (const [key, value] of Object.entries(data)) {
+                            if (key.toLowerCase().includes('support') && 
+                                value && 
+                                typeof value === 'string' && 
+                                value.match(/\d{4}-\d{2}-\d{2}|true|false/) && 
+                                value !== 'true' && value !== 'false') {
+                                return value;
+                            }
+                        }
+                        return 'Not specified';
+                    };
+                    
+                    const result = {
                         eol: targetData.eol || 'Not specified',
-                        support: targetData.support || 'Not specified',
+                        support: getSupportDate(targetData),
                         lts: targetData.lts || false,
                         cycle: targetData.cycle,
                         source: versionData ? 'api-specific' : 'api-latest'
                     };
+                    
+                    console.log(`EOL data for ${techName}:`, result);
+                    
+                    return result;
                 }
             }
         } catch (error) {
-            console.warn(`Failed to fetch EOL for ${eolTech}:`, error);
+            console.warn(`EOL API check failed for ${techName}:`, error);
         }
-
-        // Fallback: provide technology-specific EOL patterns
-        const eolPatterns = {
-            'react': 'Major versions supported ~18-24 months by Meta',
-            'vue': 'Vue 2 EOL: December 2023, Vue 3: Active',
-            'angular': 'Major versions: 18 months LTS support',
-            'node': 'LTS versions: 30 months (18 months active + 12 months maintenance)',
-            'java': 'Java 8: 2030, Java 11: 2026, Java 17: 2029, Java 21: 2031, Java 25: 2033 (LTS)',
-            'python': 'Major versions: ~5 years support',
-            'spring-boot': 'OSS: ongoing, Commercial support available',
-            'nextjs': 'Major versions: ~12-18 months support'
-        };
-
-        const pattern = eolPatterns[eolTech] || knownTech?.eolPattern;
         
-        return pattern ? {
-            eol: pattern,
-            support: 'See documentation',
-            lts: false,
-            source: 'pattern'
-        } : {};
+        return null;
+    }
+    
+    async checkVulnerabilities(techName, version, detectedType) {
+        try {
+            console.log('🔒 [SECURITY DEBUG] Starting vulnerability check:', {
+                techName: techName,
+                version: version,
+                detectedType: detectedType
+            });
+
+            // Handle runtime technologies with specialized vulnerability sources
+            const runtimeTechnologies = [
+                'java', 'jdk', 'openjdk', 'oracle-jdk',
+                'python', 'node', 'nodejs', 'node.js',
+                'go', 'golang', 'rust', 'php', 'ruby',
+                'dotnet', '.net', 'csharp', 'c#'
+            ];
+
+            const normalizedTechName = techName.toLowerCase();
+            if (runtimeTechnologies.includes(normalizedTechName)) {
+                console.log('🔒 [SECURITY DEBUG] Checking runtime vulnerabilities for:', techName, version);
+                return await this.checkRuntimeVulnerabilities(techName, version);
+            }
+
+            const ecosystemMap = {
+                'npm-package': 'npm',
+                'python-package': 'PyPI',
+                'github-release': 'GitHub'
+            };
+
+            const ecosystem = ecosystemMap[detectedType] || this.detectEcosystem(techName);
+            
+            if (!ecosystem) {
+                console.log('🔒 [SECURITY DEBUG] No ecosystem detected, skipping vulnerability check');
+                return null;
+            }
+
+            const queryPayload = {
+                package: {
+                    name: techName,
+                    ecosystem: ecosystem
+                },
+                version: version
+            };
+
+            console.log('🔒 [SECURITY DEBUG] OSV API Request:', {
+                url: this.apiEndpoints.osv,
+                payload: queryPayload
+            });
+
+            const response = await fetch(this.apiEndpoints.osv, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(queryPayload)
+            });
+
+            console.log('🔒 [SECURITY DEBUG] OSV API Response Status:', response.status, response.statusText);
+
+            if (!response.ok) {
+                throw new Error(`OSV API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('🔒 [SECURITY DEBUG] OSV API Response Data:', {
+                techName: techName,
+                vulnerabilityCount: data.vulns?.length || 0,
+                hasVulns: !!(data.vulns && data.vulns.length > 0)
+            });
+
+            if (!data.vulns || data.vulns.length === 0) {
+                return {
+                    vulnerabilities: [],
+                    count: 0,
+                    critical: 0,
+                    high: 0,
+                    medium: 0,
+                    low: 0,
+                    securityScore: 100
+                };
+            }
+
+            const processedVulns = this.processVulnerabilities(data.vulns);
+            
+            console.log('🔒 [SECURITY DEBUG] Processed Vulnerabilities:', {
+                techName: techName,
+                total: processedVulns.vulnerabilities.length,
+                critical: processedVulns.critical,
+                high: processedVulns.high,
+                securityScore: processedVulns.securityScore
+            });
+
+            return processedVulns;
+
+        } catch (error) {
+            console.warn('🔒 [SECURITY DEBUG] Vulnerability check failed:', {
+                techName: techName,
+                error: error.message
+            });
+            return null;
+        }
     }
 
-    getVersionSpecificEOL(knownTech, currentVersion) {
-        const majorVersion = this.extractMajorVersion(currentVersion);
-        const tech = knownTech.category;
-        
-        // Java version-specific EOL dates
-        if (knownTech.eolApi === 'java') {
-            const javaEOLMap = {
-                '8': { eol: '2030-12', support: '2030-12', lts: true },
-                '11': { eol: '2026-09', support: '2024-09', lts: true },
-                '17': { eol: '2029-09', support: '2027-09', lts: true },
-                '21': { eol: '2031-09', support: '2029-09', lts: true },
-                '22': { eol: '2025-03', support: '2025-03', lts: false },
-                '23': { eol: '2025-09', support: '2025-09', lts: false },
-                '24': { eol: '2026-03', support: '2026-03', lts: false },
-                '25': { eol: '2033-09', support: '2031-09', lts: true }
-            };
+    async checkRuntimeVulnerabilities(techName, version) {
+        try {
+            console.log('🔒 [SECURITY DEBUG] Checking runtime vulnerabilities:', techName, version);
             
-            const javaInfo = javaEOLMap[majorVersion];
-            if (javaInfo) {
-                return {
-                    eol: javaInfo.eol,
-                    support: javaInfo.support,
-                    lts: javaInfo.lts,
-                    cycle: `Java ${majorVersion}`,
-                    source: 'version-specific'
-                };
+            // For Node.js, use a combination of Node.js security advisories and CVE databases
+            if (techName.toLowerCase().includes('node')) {
+                return await this.checkNodeJSVulnerabilities(version);
             }
-        }
-        
-        // Node.js version-specific EOL dates
-        if (knownTech.eolApi === 'nodejs') {
-            const nodeEOLMap = {
-                '16': { eol: '2024-04-30', support: '2023-10-30', lts: true },
-                '18': { eol: '2025-04-30', support: '2024-10-30', lts: true },
-                '20': { eol: '2026-04-30', support: '2025-10-30', lts: true },
-                '21': { eol: '2024-06-01', support: '2024-06-01', lts: false },
-                '22': { eol: '2027-04-30', support: '2026-10-30', lts: true },
-                '23': { eol: '2024-06-01', support: '2024-06-01', lts: false }
-            };
             
-            const nodeInfo = nodeEOLMap[majorVersion];
-            if (nodeInfo) {
-                return {
-                    eol: nodeInfo.eol,
-                    support: nodeInfo.support,
-                    lts: nodeInfo.lts,
-                    cycle: `Node.js ${majorVersion}`,
-                    source: 'version-specific'
-                };
+            // For Java, check Oracle/OpenJDK advisories
+            if (techName.toLowerCase().includes('java') || techName.toLowerCase().includes('jdk')) {
+                return await this.checkJavaVulnerabilities(version);
             }
+            
+            // For Python, check Python security advisories
+            if (techName.toLowerCase().includes('python')) {
+                return await this.checkPythonVulnerabilities(version);
+            }
+            
+            // For other runtimes, use general CVE search
+            return await this.checkGeneralCVEDatabase(techName, version);
+            
+        } catch (error) {
+            console.warn('🔒 [SECURITY DEBUG] Runtime vulnerability check failed:', error.message);
+            return {
+                vulnerabilities: [],
+                count: 0,
+                critical: 0,
+                high: 0,
+                medium: 0,
+                low: 0,
+                securityScore: 90,
+                runtimeTechnology: true,
+                note: 'Unable to check runtime vulnerabilities at this time'
+            };
         }
+    }
 
-        // Python version-specific EOL dates
-        if (knownTech.eolApi === 'python') {
-            const pythonEOLMap = {
-                '3.8': { eol: '2024-10', support: '2024-10', lts: false },
-                '3.9': { eol: '2025-10', support: '2025-10', lts: false },
-                '3.10': { eol: '2026-10', support: '2026-10', lts: false },
-                '3.11': { eol: '2027-10', support: '2027-10', lts: false },
-                '3.12': { eol: '2028-10', support: '2028-10', lts: false },
-                '3.13': { eol: '2029-10', support: '2029-10', lts: false }
+    async checkNodeJSVulnerabilities(version) {
+        try {
+            // Try to use Node.js Security Working Group API or GitHub Security API
+            // For now, since we don't have access to these APIs, return clean state
+            console.log('🔒 [SECURITY DEBUG] Node.js vulnerability APIs not implemented yet');
+            
+            return {
+                vulnerabilities: [],
+                count: 0,
+                critical: 0,
+                high: 0,
+                medium: 0,
+                low: 0,
+                securityScore: 95,
+                runtimeTechnology: true,
+                source: 'Node.js Security Working Group (API access needed)',
+                note: 'Check nodejs.org/en/security for latest advisories'
             };
             
-            const pythonInfo = pythonEOLMap[currentVersion] || pythonEOLMap[`3.${majorVersion}`];
-            if (pythonInfo) {
-                return {
-                    eol: pythonInfo.eol,
-                    support: pythonInfo.support,
-                    lts: pythonInfo.lts,
-                    cycle: `Python ${currentVersion}`,
-                    source: 'version-specific'
-                };
+        } catch (error) {
+            console.warn('🔒 [SECURITY DEBUG] Node.js vulnerability check failed:', error.message);
+            return this.getDefaultRuntimeSecurityState();
+        }
+    }
+
+    async checkJavaVulnerabilities(version) {
+        try {
+            // Would need to integrate with Oracle Security API or NVD API
+            console.log('🔒 [SECURITY DEBUG] Java vulnerability APIs not implemented yet');
+            
+            return {
+                vulnerabilities: [],
+                count: 0,
+                critical: 0,
+                high: 0,
+                medium: 0,
+                low: 0,
+                securityScore: 95,
+                runtimeTechnology: true,
+                source: 'Oracle Critical Patch Updates (API access needed)',
+                note: 'Check oracle.com/security-alerts for latest patches'
+            };
+            
+        } catch (error) {
+            console.warn('🔒 [SECURITY DEBUG] Java vulnerability check failed:', error.message);
+            return this.getDefaultRuntimeSecurityState();
+        }
+    }
+
+    async checkPythonVulnerabilities(version) {
+        try {
+            // Would need to integrate with Python Security Response API or NVD API
+            console.log('🔒 [SECURITY DEBUG] Python vulnerability APIs not implemented yet');
+            
+            return {
+                vulnerabilities: [],
+                count: 0,
+                critical: 0,
+                high: 0,
+                medium: 0,
+                low: 0,
+                securityScore: 95,
+                runtimeTechnology: true,
+                source: 'Python Security Response Team (API access needed)',
+                note: 'Check python.org/news/security for latest advisories'
+            };
+            
+        } catch (error) {
+            console.warn('🔒 [SECURITY DEBUG] Python vulnerability check failed:', error.message);
+            return this.getDefaultRuntimeSecurityState();
+        }
+    }
+
+    async checkGeneralCVEDatabase(techName, version) {
+        try {
+            // Would need to integrate with NVD API, CVE Details API, or similar
+            console.log('🔒 [SECURITY DEBUG] General CVE APIs not implemented yet for:', techName);
+            
+            return {
+                vulnerabilities: [],
+                count: 0,
+                critical: 0,
+                high: 0,
+                medium: 0,
+                low: 0,
+                securityScore: 90,
+                runtimeTechnology: true,
+                source: 'NVD/CVE Database (API access needed)',
+                note: `Check official ${techName} security advisories for vulnerabilities`
+            };
+            
+        } catch (error) {
+            console.warn('🔒 [SECURITY DEBUG] General CVE check failed:', error.message);
+            return this.getDefaultRuntimeSecurityState();
+        }
+    }
+
+    getDefaultRuntimeSecurityState() {
+        return {
+            vulnerabilities: [],
+            count: 0,
+            critical: 0,
+            high: 0,
+            medium: 0,
+            low: 0,
+            securityScore: 90,
+            runtimeTechnology: true,
+            note: 'Runtime security status could not be determined'
+        };
+    }
+
+    calculateSecurityScoreFromVulns(vulnerabilities) {
+        let score = 100;
+        for (const vuln of vulnerabilities) {
+            switch (vuln.severity) {
+                case 'critical':
+                    score -= 25;
+                    break;
+                case 'high':
+                    score -= 15;
+                    break;
+                case 'medium':
+                    score -= 8;
+                    break;
+                case 'low':
+                    score -= 3;
+                    break;
             }
         }
+        return Math.max(score, 10);
+    }
 
-        return null;
+    detectEcosystem(techName) {
+        const ecosystemHints = {
+            // Common npm packages
+            'react': 'npm',
+            'vue': 'npm', 
+            'angular': 'npm',
+            'express': 'npm',
+            'lodash': 'npm',
+            'axios': 'npm',
+            'webpack': 'npm',
+            'typescript': 'npm',
+            'nextjs': 'npm',
+            'next.js': 'npm',
+            
+            // Common Python packages
+            'django': 'PyPI',
+            'flask': 'PyPI',
+            'requests': 'PyPI',
+            'numpy': 'PyPI',
+            'pandas': 'PyPI',
+            'fastapi': 'PyPI',
+            
+            // Languages and runtimes (use GitHub for version info)
+            'node': 'npm',
+            'nodejs': 'npm',
+            'python': 'PyPI'
+        };
+        
+        return ecosystemHints[techName.toLowerCase()] || null;
+    }
+
+    processVulnerabilities(vulns) {
+        let critical = 0, high = 0, medium = 0, low = 0;
+        const processedVulns = [];
+
+        vulns.forEach(vuln => {
+            const severity = this.extractSeverity(vuln);
+            const processedVuln = {
+                id: vuln.id,
+                summary: vuln.summary || 'No summary available',
+                severity: severity,
+                published: vuln.published,
+                modified: vuln.modified,
+                references: vuln.references || [],
+                aliases: vuln.aliases || [],
+                details: vuln.details || vuln.summary || 'No details available'
+            };
+
+            processedVulns.push(processedVuln);
+
+            switch (severity.toLowerCase()) {
+                case 'critical': critical++; break;
+                case 'high': high++; break;
+                case 'medium': medium++; break;
+                case 'low': low++; break;
+            }
+        });
+
+        // Calculate security score (100 - penalty based on severity)
+        const securityScore = Math.max(0, 100 - (critical * 25) - (high * 15) - (medium * 5) - (low * 1));
+
+        return {
+            vulnerabilities: processedVulns,
+            count: vulns.length,
+            critical,
+            high,
+            medium,
+            low,
+            securityScore
+        };
+    }
+
+    extractSeverity(vuln) {
+        // Try different places where severity might be stored
+        if (vuln.database_specific?.severity) {
+            return vuln.database_specific.severity;
+        }
+        
+        if (vuln.severity && Array.isArray(vuln.severity)) {
+            const cvssV3 = vuln.severity.find(s => s.type === 'CVSS_V3');
+            if (cvssV3?.score) {
+                return this.cvssToSeverity(cvssV3.score);
+            }
+        }
+        
+        // Look for CVE references to infer severity
+        if (vuln.aliases?.some(alias => alias.startsWith('CVE-'))) {
+            return 'medium'; // Default for CVEs
+        }
+        
+        return 'unknown';
+    }
+
+    cvssToSeverity(score) {
+        if (score >= 9.0) return 'critical';
+        if (score >= 7.0) return 'high';
+        if (score >= 4.0) return 'medium';
+        return 'low';
     }
 
     extractMajorVersion(version) {
@@ -516,41 +1936,591 @@ class AITechStackManager {
         return parts[0];
     }
 
-    performAIAnalysis(techData, knownTech) {
-        const analysis = {
-            aiPriority: 'medium',
-            securityScore: 85,
-            stabilityScore: 90,
-            recommendations: [],
-            nextSteps: [],
-            estimatedEffort: 'medium'
-        };
-
-        // Version analysis
-        const versionAnalysis = this.analyzeVersions(techData.currentVersion, techData.latestVersion);
-        analysis.versionGap = versionAnalysis.gap;
-        analysis.aiPriority = versionAnalysis.priority;
-
-        // EOL analysis
-        if (techData.eolDate) {
-            const eolAnalysis = this.analyzeEOL(techData.eolDate);
-            if (eolAnalysis.priority === 'critical') {
-                analysis.aiPriority = 'critical';
+    // Local AI Integration Methods
+    async initializeLocalAI() {
+        try {
+            const response = await fetch(`${this.localAI.ollamaURL}/api/tags`, {
+                signal: AbortSignal.timeout(2000)
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const models = data.models || [];
+                this.localAI.available = models.some(model => 
+                    model.name.includes('llama') || model.name.includes('mistral')
+                );
+                
+                if (this.localAI.available && !this.localAI.enabled) {
+                    this.showLocalAIPrompt();
+                } else if (this.localAI.available && this.localAI.enabled) {
+                    this.showAIStatus('🤖 Local AI Ready (Ollama)');
+                }
             }
-            analysis.recommendations.push(...eolAnalysis.recommendations);
+        } catch (error) {
+            this.localAI.available = false;
+            if (this.localAI.enabled) {
+                this.showAIStatus('⚠️ Ollama not running - using rule-based analysis');
+            }
+        }
+    }
+
+    showLocalAIPrompt() {
+        const notification = document.createElement('div');
+        notification.className = 'ai-notification';
+        notification.innerHTML = `
+            <div class="notification-content">
+                <div class="notification-icon">🤖</div>
+                <div class="notification-text">
+                    <h4>Local AI Available!</h4>
+                    <p>Ollama detected. Enable local AI for enhanced analysis?</p>
+                </div>
+                <div class="notification-actions">
+                    <button onclick="aiManager.enableLocalAI()" class="btn-primary btn-sm">
+                        Enable AI
+                    </button>
+                    <button onclick="this.parentElement.parentElement.remove()" class="btn-secondary btn-sm">
+                        Maybe Later
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 10 seconds if no action
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 10000);
+    }
+
+    enableLocalAI() {
+        this.localAI.enabled = true;
+        localStorage.setItem('localAI_enabled', 'true');
+        this.showAIStatus('🤖 Local AI Enabled!');
+        
+        // Remove any existing notifications
+        document.querySelectorAll('.ai-notification').forEach(el => el.remove());
+        
+        // Re-analyze existing technologies with AI
+        if (this.techData.length > 0) {
+            this.showConfirmAIReanalysis();
+        }
+    }
+
+    showConfirmAIReanalysis() {
+        if (confirm('Re-analyze existing technologies with local AI? This will provide enhanced insights.')) {
+            this.aiAnalyzeAll();
+        }
+    }
+
+    async performOllamaAnalysis(techData, knownTech) {
+        try {
+            const prompt = this.buildOllamaPrompt(techData, knownTech);
+            
+            const response = await fetch(`${this.localAI.ollamaURL}/api/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: this.localAI.defaultModel,
+                    prompt: prompt,
+                    stream: false,
+                    options: {
+                        temperature: 0.3,
+                        num_ctx: 4096
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Ollama API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return this.parseOllamaResponse(data.response, techData, knownTech);
+
+        } catch (error) {
+            console.warn('Ollama analysis failed:', error);
+            this.localAI.available = false;
+            throw error;
+        }
+    }
+
+    buildOllamaPrompt(techData, knownTech) {
+        const versionContext = this.buildVersionContext(techData);
+        
+        return `You are a DevOps expert analyzing a technology stack component. Provide specific, actionable analysis.
+
+TECHNOLOGY: ${techData.technology}
+CURRENT VERSION: ${techData.currentVersion}
+LATEST VERSION: ${techData.latestVersion || 'Unknown'}
+CATEGORY: ${knownTech?.category || 'Unknown'}
+EOL DATE: ${techData.eolDate || 'Unknown'}
+ENVIRONMENT: ${techData.environment || 'Not specified'}
+
+${versionContext}
+
+Analyze this technology and respond with JSON in this exact format:
+{
+  "priority": "critical|high|medium|low",
+  "summary": "One sentence summary of the current state",
+  "recommendations": [
+    "Specific recommendation 1",
+    "Specific recommendation 2", 
+    "Specific recommendation 3"
+  ],
+  "risks": [
+    "Security or compatibility risk",
+    "Performance or maintenance risk"
+  ],
+  "nextSteps": [
+    "Immediate action to take",
+    "Planning step",
+    "Implementation milestone"
+  ],
+  "urgency": "Timeframe for action (e.g., '2-4 weeks', 'next quarter')",
+  "complexity": "low|medium|high"
+}
+
+CRITICAL RULES:
+- NEVER INVENT VERSION NUMBERS: Only use versions explicitly listed above
+- CURRENT VERSION: ${techData.currentVersion} - LATEST VERSION: ${techData.latestVersion || 'Unknown'}
+- If suggesting upgrades, use ONLY the LATEST VERSION number provided
+- If LATEST VERSION is "Unknown", use phrases like "latest stable version" NOT specific numbers
+- FORBIDDEN: Do not suggest version 27, 25+, 26+, or any version not explicitly provided
+- FORBIDDEN: Do not suggest version numbers higher than what is provided
+- ONLY recommend upgrades to NEWER versions, never suggest downgrading to older versions
+- Understand version chronology and semantic versioning (higher numbers are typically newer)
+- When suggesting version changes, ensure they represent actual improvements (security, features, performance)
+- If downgrading is absolutely necessary due to compatibility issues, clearly explain why
+- SECURITY PRIORITY: If there are Critical vulnerabilities, set priority to "critical" and urgency to immediate
+- SECURITY PRIORITY: If there are High vulnerabilities, set priority to "high" and address urgently
+- Factor security vulnerabilities heavily into risk assessment and upgrade urgency
+
+Focus on:
+- Security implications of the current version
+- Performance benefits of upgrading to newer (not older) versions
+- Compatibility concerns with modern libraries
+- Enterprise/production considerations
+- Specific migration steps that make logical sense
+
+Be concise but specific about versions and provide actionable steps.`;
+    }
+
+    buildVersionContext(techData) {
+        const currentVersion = techData.currentVersion;
+        const latestVersion = techData.latestVersion;
+        
+        let context = `CONTEXT: Currently running ${techData.technology} version ${currentVersion}.`;
+        
+        if (latestVersion && latestVersion !== 'Unknown') {
+            context += ` Latest available version is ${latestVersion}.`;
+            context += ` CONSTRAINT: You must ONLY recommend upgrading to version ${latestVersion}. Do not suggest any other version numbers.`;
+        } else {
+            context += ` Latest version is unknown - CONSTRAINT: You must NOT suggest any specific version numbers.`;
+        }
+        
+        context += ` Always recommend upgrading to newer versions for better security, performance, and features. Never suggest downgrading to older versions unless there are critical compatibility issues that cannot be resolved otherwise.`;
+        
+        return context;
+    }
+
+    buildVulnerabilityContext(techData) {
+        if (!techData.vulnerabilities || techData.vulnerabilities.length === 0) {
+            return 'SECURITY STATUS: No known vulnerabilities detected for this version.';
         }
 
-        // Technology-specific insights
-        if (knownTech) {
-            const techSpecificInsights = this.getTechnologySpecificInsights(techData, knownTech);
-            analysis.recommendations.push(...techSpecificInsights.recommendations);
-            analysis.nextSteps.push(...techSpecificInsights.nextSteps);
+        const criticalCount = techData.criticalVulns || 0;
+        const highCount = techData.highVulns || 0;
+        const totalCount = techData.vulnerabilityCount || 0;
+        const securityScore = techData.securityScore || 'Unknown';
+
+        let context = `SECURITY STATUS: ${totalCount} vulnerabilities found in this version (Security Score: ${securityScore}/100).`;
+        
+        if (criticalCount > 0) {
+            context += ` CRITICAL: ${criticalCount} critical vulnerabilities require IMMEDIATE attention.`;
+        }
+        
+        if (highCount > 0) {
+            context += ` HIGH PRIORITY: ${highCount} high-severity vulnerabilities should be addressed urgently.`;
         }
 
-        // Generate next steps
-        analysis.nextSteps = this.generateNextSteps(techData, analysis);
+        // Add specific vulnerability IDs for context
+        const criticalVulns = techData.vulnerabilities.filter(v => v.severity === 'critical');
+        const highVulns = techData.vulnerabilities.filter(v => v.severity === 'high');
+        
+        if (criticalVulns.length > 0) {
+            context += ` Critical vulnerabilities: ${criticalVulns.map(v => v.id).join(', ')}.`;
+        }
+        
+        if (highVulns.length > 0 && criticalVulns.length === 0) {
+            context += ` High vulnerabilities: ${highVulns.slice(0, 3).map(v => v.id).join(', ')}${highVulns.length > 3 ? ' and others' : ''}.`;
+        }
 
-        return analysis;
+        return context;
+    }
+
+    buildVulnerabilityContext(techData) {
+        if (!techData.vulnerabilities || techData.vulnerabilities.length === 0) {
+            return 'SECURITY STATUS: No known vulnerabilities detected for this version.';
+        }
+
+        const criticalCount = techData.criticalVulns || 0;
+        const highCount = techData.highVulns || 0;
+        const totalCount = techData.vulnerabilityCount || 0;
+        const securityScore = techData.securityScore || 'Unknown';
+
+        let context = `SECURITY STATUS: ${totalCount} vulnerabilities found in this version (Security Score: ${securityScore}/100).`;
+        
+        if (criticalCount > 0) {
+            context += ` CRITICAL: ${criticalCount} critical vulnerabilities require IMMEDIATE attention.`;
+        }
+        
+        if (highCount > 0) {
+            context += ` HIGH PRIORITY: ${highCount} high-severity vulnerabilities should be addressed urgently.`;
+        }
+
+        // Add specific vulnerability IDs for context
+        const criticalVulns = techData.vulnerabilities.filter(v => v.severity === 'critical');
+        const highVulns = techData.vulnerabilities.filter(v => v.severity === 'high');
+        
+        if (criticalVulns.length > 0) {
+            context += ` Critical vulnerabilities: ${criticalVulns.map(v => v.id).join(', ')}.`;
+        }
+        
+        if (highVulns.length > 0 && criticalVulns.length === 0) {
+            context += ` High vulnerabilities: ${highVulns.slice(0, 3).map(v => v.id).join(', ')}${highVulns.length > 3 ? ' and others' : ''}.`;
+        }
+
+        return context;
+    }
+
+    parseOllamaResponse(response, techData, knownTech) {
+        try {
+            // Extract JSON from the response
+            const jsonMatch = response.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                throw new Error('No JSON found in response');
+            }
+
+            const parsed = JSON.parse(jsonMatch[0]);
+            
+            // Version validation - check for invalid version suggestions
+            const responseText = JSON.stringify(parsed);
+            const currentVersion = techData.currentVersion || '';
+            const latestVersion = techData.latestVersion || '';
+            
+            // Look for version numbers that aren't in our provided data
+            const versionPattern = /version\s+(\d+(?:\.\d+)*(?:\+)?)/gi;
+            const suggestedVersions = [];
+            let match;
+            while ((match = versionPattern.exec(responseText)) !== null) {
+                suggestedVersions.push(match[1]);
+            }
+            
+            // Validate suggested versions
+            for (const version of suggestedVersions) {
+                if (version !== currentVersion && 
+                    version !== latestVersion && 
+                    !currentVersion.includes(version) && 
+                    !latestVersion.includes(version)) {
+                    console.warn(`🚨 VERSION VALIDATION: AI suggested invalid version ${version} for ${techData.technology}. Current: ${currentVersion}, Latest: ${latestVersion}`);
+                }
+            }
+            
+            // Determine final priority based on vulnerabilities and AI analysis
+            const aiPriority = parsed.priority || 'medium';
+            const finalPriority = this.determineOverallPriority(aiPriority, techData);
+            
+            return {
+                aiPriority: finalPriority,
+                aiSummary: parsed.summary || '',
+                recommendations: parsed.recommendations || [],
+                nextSteps: parsed.nextSteps || [],
+                aiRisks: parsed.risks || [],
+                aiUrgency: parsed.urgency || '',
+                upgradeComplexity: parsed.complexity || 'medium',
+                enhancedByAI: true,
+                aiProvider: 'ollama-local',
+                analysisDate: new Date().toISOString(),
+                // Include original analysis data
+                securityScore: this.calculateSecurityScore(techData, parsed),
+                stabilityScore: this.calculateStabilityScore(techData, parsed),
+                estimatedEffort: parsed.complexity || 'medium'
+            };
+
+        } catch (error) {
+            console.warn('Failed to parse Ollama response:', error);
+            
+            // Fallback: return enhanced rule-based analysis with complete AI summary
+            const ruleBasedAnalysis = this.performRuleBasedAnalysis(techData, knownTech);
+            return {
+                ...ruleBasedAnalysis,
+                aiSummary: response.replace(/```json|```|\{[\s\S]*\}/, '').trim() || 'AI analysis completed for this technology component.',
+                enhancedByAI: true,
+                aiProvider: 'ollama-local-fallback'
+            };
+        }
+    }
+
+    // Override priority based on vulnerability severity
+    determineOverallPriority(aiPriority, techData) {
+        // Vulnerability-based priority override
+        if (techData.criticalVulns && techData.criticalVulns > 0) {
+            console.log('🚨 [PRIORITY OVERRIDE] Critical vulnerabilities detected - setting priority to CRITICAL');
+            return 'critical';
+        }
+        
+        if (techData.highVulns && techData.highVulns > 0) {
+            // High vulnerabilities elevate to high priority unless already critical
+            const newPriority = ['critical', 'high'].includes(aiPriority) ? aiPriority : 'high';
+            console.log('⚠️ [PRIORITY OVERRIDE] High vulnerabilities detected - elevating priority to:', newPriority);
+            return newPriority;
+        }
+        
+        // EOL soon also elevates priority
+        if (techData.eolDate && this.isEOLSoon(techData.eolDate)) {
+            const priorities = ['low', 'medium', 'high', 'critical'];
+            const currentIndex = priorities.indexOf(aiPriority);
+            const elevatedIndex = Math.min(currentIndex + 1, priorities.length - 1);
+            console.log('📅 [PRIORITY OVERRIDE] EOL approaching - elevating priority from', aiPriority, 'to', priorities[elevatedIndex]);
+            return priorities[elevatedIndex];
+        }
+        
+        return aiPriority;
+    }
+
+    calculateSecurityScore(techData, aiAnalysis) {
+        let score = 85; // Base score
+        
+        // Factor in vulnerability data first (most important)
+        if (techData.vulnerabilities && techData.vulnerabilities.length > 0) {
+            const criticalVulns = techData.criticalVulns || 0;
+            const highVulns = techData.highVulns || 0;
+            const mediumVulns = techData.vulnerabilities.filter(v => v.severity === 'medium').length;
+            const lowVulns = techData.vulnerabilities.filter(v => v.severity === 'low').length;
+            
+            // Severe penalties for actual vulnerabilities
+            score -= (criticalVulns * 30);  // Critical vulns are very serious
+            score -= (highVulns * 20);      // High vulns are serious
+            score -= (mediumVulns * 10);    // Medium vulns are concerning
+            score -= (lowVulns * 3);        // Low vulns are minor issues
+            
+            console.log('🔒 [SECURITY CALC] Vulnerability impact:', {
+                technology: techData.technology,
+                baseScore: 85,
+                criticalVulns,
+                highVulns,
+                scoreAfterVulns: score
+            });
+        }
+        
+        // Factor in AI analysis priority (less weight than actual vulnerabilities)
+        if (aiAnalysis.priority === 'critical') score -= 15;
+        else if (aiAnalysis.priority === 'high') score -= 10;
+        else if (aiAnalysis.priority === 'medium') score -= 5;
+        
+        // Factor in EOL status
+        if (techData.eolDate && this.isEOLSoon(techData.eolDate)) {
+            score -= 20;
+        }
+        
+        return Math.max(score, 0);
+    }
+
+    calculateStabilityScore(techData, aiAnalysis) {
+        let score = 90; // Base score
+        
+        if (aiAnalysis.complexity === 'high') score -= 15;
+        else if (aiAnalysis.complexity === 'medium') score -= 5;
+        
+        return Math.max(score, 30);
+    }
+
+    isEOLSoon(eolDate) {
+        if (!eolDate || eolDate.includes('Not specified') || eolDate.includes('ongoing')) {
+            return false;
+        }
+        
+        try {
+            const eolTimestamp = new Date(eolDate).getTime();
+            const now = Date.now();
+            const sixMonthsFromNow = now + (6 * 30 * 24 * 60 * 60 * 1000);
+            
+            return eolTimestamp < sixMonthsFromNow;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    showAIStatus(message) {
+        // Create or update AI status indicator
+        let statusEl = document.getElementById('ai-status');
+        if (!statusEl) {
+            statusEl = document.createElement('div');
+            statusEl.id = 'ai-status';
+            statusEl.className = 'ai-status-indicator';
+            
+            const headerActions = document.querySelector('.header-actions');
+            headerActions.appendChild(statusEl);
+        }
+        
+        statusEl.innerHTML = `
+            <span class="ai-status-text">${message}</span>
+            <button class="ai-config-btn" onclick="aiManager.showAIConfig()" title="AI Configuration">
+                <i class="fas fa-cog"></i>
+            </button>
+        `;
+        
+        // Auto-hide success messages after 5 seconds
+        if (message.includes('Ready') || message.includes('Enabled')) {
+            setTimeout(() => {
+                statusEl.querySelector('.ai-status-text').style.opacity = '0.7';
+            }, 5000);
+        }
+    }
+
+    showAIConfig() {
+        const modal = document.createElement('div');
+        modal.className = 'modal ai-config-modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2><i class="fas fa-brain"></i> Local AI Configuration</h2>
+                    <button class="close-btn" onclick="this.parentElement.parentElement.parentElement.remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="ai-status-section">
+                        <h3>Current Status</h3>
+                        <div class="status-grid">
+                            <div class="status-item">
+                                <span class="status-label">Ollama:</span>
+                                <span class="status-value ${this.localAI.available ? 'status-good' : 'status-error'}">
+                                    ${this.localAI.available ? '✅ Available' : '❌ Not Available'}
+                                </span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Local AI:</span>
+                                <span class="status-value ${this.localAI.enabled ? 'status-good' : 'status-neutral'}">
+                                    ${this.localAI.enabled ? '✅ Enabled' : '⚪ Disabled'}
+                                </span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Model:</span>
+                                <span class="status-value">${this.localAI.defaultModel}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${!this.localAI.available ? `
+                        <div class="setup-instructions">
+                            <h3>Setup Ollama</h3>
+                            <div class="setup-steps">
+                                <div class="step">
+                                    <div class="step-number">1</div>
+                                    <div class="step-content">
+                                        <h4>Download Ollama</h4>
+                                        <p>Download from <a href="https://ollama.ai/download" target="_blank">ollama.ai</a></p>
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-number">2</div>
+                                    <div class="step-content">
+                                        <h4>Install a Model</h4>
+                                        <p>Run in terminal: <code>ollama run llama3.2:3b</code></p>
+                                        <small>(Downloads ~2GB model, one-time setup)</small>
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-number">3</div>
+                                    <div class="step-content">
+                                        <h4>Refresh</h4>
+                                        <button onclick="location.reload()" class="btn-primary btn-sm">
+                                            <i class="fas fa-sync"></i> Refresh Page
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="ai-controls">
+                        <h3>Controls</h3>
+                        <div class="control-group">
+                            <label class="toggle-switch">
+                                <input type="checkbox" ${this.localAI.enabled ? 'checked' : ''} 
+                                       onchange="aiManager.toggleLocalAI(this.checked)">
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-label">Enable Local AI Analysis</span>
+                            </label>
+                        </div>
+                        
+                        ${this.localAI.enabled && this.techData.length > 0 ? `
+                            <button onclick="aiManager.reanalyzeWithAI()" class="btn-secondary full-width">
+                                <i class="fas fa-sync"></i> Re-analyze All Technologies with AI
+                            </button>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="ai-benefits">
+                        <h3>Local AI Benefits</h3>
+                        <ul>
+                            <li>🔒 <strong>Complete Privacy:</strong> Analysis never leaves your computer</li>
+                            <li>⚡ <strong>Fast Analysis:</strong> 1-3 second response times</li>
+                            <li>🎯 <strong>Context-Aware:</strong> Understands your specific technology stack</li>
+                            <li>💡 <strong>Smart Insights:</strong> Enterprise-focused recommendations</li>
+                            <li>🔄 <strong>Always Available:</strong> Works offline, no API limits</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="this.parentElement.parentElement.parentElement.remove()" class="btn-secondary">
+                        Close
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+    }
+
+    toggleLocalAI(enabled) {
+        this.localAI.enabled = enabled;
+        localStorage.setItem('localAI_enabled', enabled.toString());
+        
+        if (enabled && this.localAI.available) {
+            this.showAIStatus('🤖 Local AI Enabled');
+        } else if (enabled && !this.localAI.available) {
+            this.showAIStatus('⚠️ Please install Ollama first');
+        } else {
+            this.showAIStatus('📊 Using rule-based analysis');
+        }
+    }
+
+    async reanalyzeWithAI() {
+        if (confirm(`Re-analyze ${this.techData.length} technologies with local AI?`)) {
+            await this.aiAnalyzeAll();
+        }
+    }
+
+    async performAIAnalysis(techData) {
+        // Try local AI first if available
+        if (this.localAI.enabled && this.localAI.available) {
+            try {
+                return await this.performOllamaAnalysis(techData);
+            } catch (error) {
+                console.warn('Local AI failed, using rule-based analysis:', error);
+                this.showAIStatus('⚠️ Local AI error - using rule-based analysis');
+            }
+        }
+        
+        // Fallback to rule-based analysis
+        return this.performRuleBasedAnalysis(techData);
     }
 
     analyzeVersions(current, latest) {
@@ -569,12 +2539,12 @@ class AITechStackManager {
             if (majorDiff > 0) {
                 return { 
                     gap: `${majorDiff} major version${majorDiff > 1 ? 's' : ''} behind`,
-                    priority: majorDiff >= 2 ? 'critical' : 'high'
+                    priority: majorDiff >= 5 ? 'high' : 'medium'  // Reduced from critical/high to high/medium
                 };
             } else if (minorDiff > 0) {
                 return { 
                     gap: `${minorDiff} minor version${minorDiff > 1 ? 's' : ''} behind`,
-                    priority: minorDiff >= 5 ? 'high' : 'medium'
+                    priority: minorDiff >= 10 ? 'high' : 'medium'  // Increased threshold
                 };
             } else if (patchDiff > 0) {
                 return { 
@@ -589,7 +2559,74 @@ class AITechStackManager {
         }
     }
 
-    analyzeEOL(eolDate) {
+    analyzeEOL(eolDate, supportDate) {
+        // Analyze both support and EOL dates for comprehensive lifecycle assessment
+        const supportAnalysis = this.analyzeSupportDate(supportDate);
+        const eolAnalysis = this.analyzeEOLDate(eolDate);
+        
+        // Return the higher priority of the two
+        const priorities = ['low', 'medium', 'high', 'critical'];
+        const supportPriority = priorities.indexOf(supportAnalysis.priority);
+        const eolPriority = priorities.indexOf(eolAnalysis.priority);
+        
+        const finalPriority = priorities[Math.max(supportPriority, eolPriority)];
+        
+        // Combine recommendations
+        const recommendations = [
+            ...supportAnalysis.recommendations,
+            ...eolAnalysis.recommendations
+        ];
+        
+        return {
+            priority: finalPriority,
+            recommendations: recommendations
+        };
+    }
+    
+    analyzeSupportDate(supportDate) {
+        if (!supportDate || supportDate === 'Not specified' || supportDate.toLowerCase().includes('not specified')) {
+            return {
+                priority: 'low',
+                recommendations: []
+            };
+        }
+        
+        const today = new Date();
+        const supportDateObj = this.parseDate(supportDate);
+        
+        if (supportDateObj && !isNaN(supportDateObj.getTime())) {
+            const daysUntilEndOfSupport = Math.ceil((supportDateObj - today) / (1000 * 60 * 60 * 24));
+            
+            if (daysUntilEndOfSupport < 0) {
+                return {
+                    priority: 'critical',  // Support already ended = critical
+                    recommendations: ['🛠️ Regular support has ended - only security patches available']
+                };
+            } else if (daysUntilEndOfSupport < 365) {  // 1 year = high
+                return {
+                    priority: 'high',
+                    recommendations: [`⏰ Regular support ends in ${Math.ceil(daysUntilEndOfSupport / 30)} months - start planning migration`]
+                };
+            } else if (daysUntilEndOfSupport < 1095) {  // 3 years = medium (2028 from 2026)
+                return {
+                    priority: 'medium',
+                    recommendations: [`📅 Regular support ends in ${Math.ceil(daysUntilEndOfSupport / 365)} years - begin upgrade planning`]
+                };
+            } else {
+                return {
+                    priority: 'low',
+                    recommendations: [`✅ Regular support continues for ${Math.ceil(daysUntilEndOfSupport / 365)} year(s)`]
+                };
+            }
+        }
+        
+        return {
+            priority: 'low',
+            recommendations: []
+        };
+    }
+    
+    analyzeEOLDate(eolDate) {
         if (!eolDate || eolDate.toLowerCase().includes('not specified') || eolDate.toLowerCase().includes('active')) {
             return {
                 priority: 'low',
@@ -673,122 +2710,31 @@ class AITechStackManager {
             recommendations: [`📋 EOL Information: ${eolDate} - review specific dates for your version`]
         };
     }
-
-    getTechnologySpecificInsights(techData, knownTech) {
-        const insights = {
-            recommendations: [],
-            nextSteps: []
-        };
-
-        switch (knownTech.category) {
-            case 'frontend':
-                insights.recommendations.push(
-                    '🎨 Consider performance impact of framework updates',
-                    '📱 Ensure mobile compatibility with new version',
-                    '🧪 Test component rendering thoroughly'
-                );
-                insights.nextSteps.push(
-                    'Review breaking changes in release notes',
-                    'Update development dependencies',
-                    'Run comprehensive testing suite'
-                );
-                break;
-
-            case 'backend':
-                insights.recommendations.push(
-                    '🔒 Review security patches in newer versions',
-                    '📊 Monitor performance after upgrade',
-                    '🔄 Plan for backward compatibility'
-                );
-                insights.nextSteps.push(
-                    'Set up staging environment testing',
-                    'Review API compatibility',
-                    'Plan gradual rollout strategy'
-                );
-                break;
-
-            case 'database':
-                insights.recommendations.push(
-                    '💾 Backup data before upgrade',
-                    '🔄 Test migration scripts',
-                    '📈 Monitor query performance post-upgrade'
-                );
-                insights.nextSteps.push(
-                    'Schedule maintenance window',
-                    'Prepare rollback plan',
-                    'Test backup restoration'
-                );
-                break;
-
-            case 'language':
-                if (techData.technology.toLowerCase().includes('java')) {
-                    const currentMajor = parseInt(techData.currentVersion);
-                    const latestMajor = parseInt(techData.latestVersion || '25');
-                    
-                    if (currentMajor < 25) {
-                        insights.recommendations.push(
-                            '☕ Java 25 is the current LTS - consider upgrading for long-term support',
-                            '⚡ Virtual threads and pattern matching improvements available',
-                            '� Enhanced security and performance optimizations'
-                        );
-                        insights.nextSteps.push(
-                            'Review Java 25 LTS migration guide',
-                            'Test application with Java 25',
-                            'Update build tools and dependencies',
-                            'Plan LTS upgrade timeline'
-                        );
-                    } else if (currentMajor === 25) {
-                        insights.recommendations.push(
-                            '✅ You\'re on Java 25 LTS - excellent choice for production',
-                            '🔄 Monitor for patch updates within Java 25',
-                            '📚 Consider exploring newer Java features in development'
-                        );
-                    } else {
-                        insights.recommendations.push(
-                            '🆕 You\'re on a newer Java version - consider LTS for production stability',
-                            '📊 Evaluate if cutting-edge features justify non-LTS version',
-                            '🔄 Plan migration path to next LTS when available'
-                        );
-                    }
-                } else {
-                    insights.recommendations.push(
-                        '�🔧 Check dependency compatibility',
-                        '📚 Review deprecated features',
-                        '⚡ Leverage new performance improvements'
-                    );
-                    insights.nextSteps.push(
-                        'Audit codebase for deprecated features',
-                        'Update CI/CD pipeline',
-                        'Train team on new features'
-                    );
-                }
-                break;
-
-            case 'runtime':
-                if (techData.technology.toLowerCase().includes('node')) {
-                    insights.recommendations.push(
-                        '🔒 Node.js security updates are critical',
-                        '⚡ Performance improvements in newer versions',
-                        '📦 Check npm ecosystem compatibility'
-                    );
-                    insights.nextSteps.push(
-                        'Review Node.js release notes',
-                        'Test with updated npm packages',
-                        'Update deployment configurations'
-                    );
-                }
-                break;
-
-            default:
-                insights.recommendations.push(
-                    '🔍 Review technology-specific release notes',
-                    '🧪 Test in development environment first',
-                    '📊 Monitor system metrics after upgrade'
-                );
-                break;
+    
+    parseDate(dateString) {
+        if (!dateString) return null;
+        
+        let dateObj = null;
+        
+        // Handle various date formats
+        if (dateString.match(/\d{4}-\d{2}-\d{2}/)) {
+            // Format: 2029-10-15
+            dateObj = new Date(dateString);
+        } else if (dateString.match(/\d{4}-\d{2}/)) {
+            // Format: 2029-10
+            dateObj = new Date(dateString + '-01');
+        } else if (dateString.match(/\d{4}/)) {
+            // Format: 2029
+            dateObj = new Date(dateString + '-01-01');
+        } else if (dateString.includes('2026') || dateString.includes('2027') || dateString.includes('2028') || dateString.includes('2029') || dateString.includes('2030') || dateString.includes('2031')) {
+            // Extract year from text
+            const yearMatch = dateString.match(/(\d{4})/);
+            if (yearMatch) {
+                dateObj = new Date(yearMatch[1] + '-01-01');
+            }
         }
-
-        return insights;
+        
+        return dateObj;
     }
 
     generateNextSteps(techData, analysis) {
@@ -828,43 +2774,457 @@ class AITechStackManager {
     }
 
     async aiAnalyzeAll() {
-        if (this.techData.length === 0) {
-            this.showError('No technologies to analyze. Add some technologies first.');
+        const filteredData = this.getFilteredTechData();
+        
+        // Debug: Log the current filter and data
+        console.log('Current product filter:', this.currentProductFilter);
+        console.log('Filtered data count:', filteredData.length);
+        console.log('Total data count:', this.techData.length);
+        console.log('Filtered products:', [...new Set(filteredData.map(t => t.product))]);
+        
+        if (filteredData.length === 0) {
+            const productName = this.currentProductFilter || 'the selected product';
+            this.showError(`No technologies to analyze for ${productName}. Add some technologies first.`);
             return;
         }
 
-        this.showLoading('AI is analyzing all technologies...');
+        // Update button state
+        const aiAnalyzeBtn = document.getElementById('aiAnalyzeAll');
+        const originalText = aiAnalyzeBtn.innerHTML;
+        aiAnalyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> AI Analyzing...';
+        aiAnalyzeBtn.disabled = true;
 
         try {
-            const updatedData = [];
-            
-            for (const tech of this.techData) {
+            // Analyze each technology in the current product filter
+            for (let i = 0; i < filteredData.length; i++) {
+                const tech = filteredData[i];
+                console.log(`Analyzing tech ${i + 1}/${filteredData.length}: ${tech.technology} (Product: ${tech.product})`);
+                aiAnalyzeBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Analyzing ${i + 1}/${filteredData.length}...`;
+                
                 const updated = await this.aiAnalyzeTechnology(
                     tech.technology, 
                     tech.currentVersion, 
-                    tech.environment
+                    tech.product
                 );
-                updated.id = tech.id; // Preserve ID
-                updatedData.push(updated);
                 
-                // Update loading steps
-                this.updateLoadingStep();
-                await new Promise(resolve => setTimeout(resolve, 500)); // Rate limiting
+                // Preserve the original tech object and merge updates
+                const techIndex = this.techData.findIndex(t => t.id === tech.id);
+                if (techIndex !== -1) {
+                    // Preserve all existing properties and merge with updates
+                    this.techData[techIndex] = {
+                        ...this.techData[techIndex], // Preserve original data
+                        ...updated,                   // Apply updates
+                        id: tech.id                   // Ensure ID is preserved
+                    };
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 300)); // Rate limiting
             }
-
-            this.techData = updatedData;
             this.saveData();
             this.renderStats();
             this.renderTechCards();
-            this.hideLoading();
             
-            // Generate overall recommendations
-            this.generateOverallRecommendations();
+            // Now perform overall stack analysis with Ollama if available
+            if (this.localAI.enabled && this.localAI.available) {
+                aiAnalyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating Stack Insights...';
+                await this.performOllamaOverallAnalysis();
+            } else {
+                // Fallback to rule-based overall recommendations
+                this.generateOverallRecommendations();
+            }
             
         } catch (error) {
-            this.hideLoading();
             this.showError(`AI analysis failed: ${error.message}`);
+        } finally {
+            // Restore button state
+            aiAnalyzeBtn.innerHTML = originalText;
+            aiAnalyzeBtn.disabled = false;
         }
+    }
+    
+    async performOllamaOverallAnalysis() {
+        const stackSummary = this.buildStackSummary();
+        const prompt = this.buildOverallAnalysisPrompt(stackSummary);
+        
+        try {
+            const requestPayload = {
+                model: this.localAI.defaultModel,
+                prompt: prompt,
+                stream: false,
+                options: {
+                    temperature: 0.3,
+                    top_p: 0.9
+                }
+            };
+
+            console.log('🤖 [AI DEBUG] Ollama Overall Analysis Request:', {
+                url: `${this.localAI.ollamaURL}/api/generate`,
+                method: 'POST',
+                stackSize: stackSummary.length,
+                model: this.localAI.defaultModel,
+                promptLength: prompt.length
+            });
+
+            const response = await fetch(`${this.localAI.ollamaURL}/api/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestPayload)
+            });
+            
+            console.log('🤖 [AI DEBUG] Overall Analysis Response Status:', {
+                status: response.status,
+                ok: response.ok,
+                statusText: response.statusText
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Ollama analysis failed: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('🤖 [AI DEBUG] Overall Analysis Response Data:', {
+                responseLength: data.response?.length || 0,
+                hasResponse: !!data.response,
+                responsePreview: data.response?.substring(0, 200) + '...'
+            });
+            
+            const analysis = this.parseOverallAnalysis(data.response);
+            this.displayOverallAnalysis(analysis);
+            
+        } catch (error) {
+            console.error('Ollama overall analysis failed:', error);
+            // Fallback to rule-based recommendations
+            this.generateOverallRecommendations();
+        }
+    }
+    
+    buildStackSummary() {
+        const filteredData = this.getFilteredTechData();
+        return filteredData.map(tech => ({
+            name: this.normalizeTechName(tech.technology),
+            current: tech.currentVersion,
+            latest: tech.latestVersion,
+            environment: tech.environment,
+            priority: tech.aiPriority || 'unknown',
+            eolDate: tech.eolDate,
+            recommendations: tech.recommendations || [],
+            category: tech.category || 'unknown'
+        }));
+    }
+    
+    normalizeTechName(techName) {
+        if (!techName) return '';
+        
+        // Case-insensitive normalization mapping
+        const normalizedNames = {
+            'react': 'React',
+            'vue': 'Vue.js',
+            'angular': 'Angular',
+            'nodejs': 'Node.js',
+            'node': 'Node.js',
+            'node.js': 'Node.js',
+            'javascript': 'JavaScript',
+            'typescript': 'TypeScript',
+            'python': 'Python',
+            'java': 'Java',
+            'spring': 'Spring',
+            'springboot': 'Spring Boot',
+            'spring-boot': 'Spring Boot',
+            'postgresql': 'PostgreSQL',
+            'postgres': 'PostgreSQL',
+            'mysql': 'MySQL',
+            'mongodb': 'MongoDB',
+            'redis': 'Redis',
+            'docker': 'Docker',
+            'kubernetes': 'Kubernetes',
+            'nginx': 'Nginx',
+            'apache': 'Apache',
+            'golang': 'Go',
+            'go': 'Go',
+            'rust': 'Rust',
+            'php': 'PHP',
+            'dotnet': '.NET',
+            '.net': '.NET',
+            'csharp': 'C#',
+            'c#': 'C#'
+        };
+        
+        const lowercaseName = techName.toLowerCase().trim();
+        return normalizedNames[lowercaseName] || techName;
+    }
+    
+    buildOverallAnalysisPrompt(stackSummary) {
+        const techList = stackSummary.map(tech => 
+            `${tech.name} (Current: ${tech.current}, Latest: ${tech.latest || 'Unknown'}, Product: ${tech.product || 'Unknown'}, Priority: ${tech.priority})`
+        ).join('\\n');
+        
+        const criticalTechs = stackSummary.filter(t => t.priority === 'critical').length;
+        const highTechs = stackSummary.filter(t => t.priority === 'high').length;
+        
+        return `Analyze this complete technology stack and provide strategic recommendations:
+
+TECHNOLOGY STACK (${stackSummary.length} technologies):
+${techList}
+
+CURRENT PRIORITIES:
+- Critical issues: ${criticalTechs}
+- High priority: ${highTechs}
+
+Provide comprehensive analysis in JSON format:
+{
+  "overallHealth": "excellent|good|concerning|critical",
+  "summary": "2-sentence overall assessment of the tech stack",
+  "strategicPriorities": [
+    "Top priority strategic action",
+    "Second priority action", 
+    "Third priority action"
+  ],
+  "riskAssessment": {
+    "security": "high|medium|low",
+    "maintenance": "high|medium|low", 
+    "scalability": "high|medium|low",
+    "compatibility": "high|medium|low"
+  },
+  "quickWins": [
+    "Easy improvement with high impact",
+    "Another quick win opportunity"
+  ],
+  "longTermPlan": [
+    "6-month modernization goal",
+    "12-month strategic goal"
+  ],
+  "budgetConsiderations": "Brief note on investment needed",
+  "teamImpact": "Brief note on team/skills needed",
+  "architecturalInsights": "Brief note on stack coherence and patterns"
+}
+
+Focus on:
+- Technology compatibility and synergy across the stack
+- Security implications of current version combinations  
+- Modernization opportunities and migration paths
+- Resource allocation priorities
+- Technical debt assessment`;
+    }
+    
+    parseOverallAnalysis(response) {
+        try {
+            // Strategy 1: Try to extract JSON from the response
+            const jsonMatch = response.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                let jsonStr = jsonMatch[0];
+                // Clean up any potential formatting issues
+                jsonStr = this.cleanJsonArrays(jsonStr);
+                const parsed = JSON.parse(jsonStr);
+                
+                // Return structured data for nice formatting
+                return {
+                    overallHealth: parsed.overallHealth || 'good',
+                    summary: parsed.summary || 'Technology stack analysis completed',
+                    strategicPriorities: parsed.strategicPriorities || [],
+                    riskAssessment: parsed.riskAssessment || {},
+                    quickWins: parsed.quickWins || [],
+                    longTermPlan: parsed.longTermPlan || [],
+                    budgetConsiderations: parsed.budgetConsiderations || '',
+                    teamImpact: parsed.teamImpact || '',
+                    architecturalInsights: parsed.architecturalInsights || '',
+                    isStructured: true
+                };
+            }
+            
+            // Strategy 2: Look for code blocks
+            const codeBlockMatch = response.match(/```(?:json)?\s*({[\s\S]*?})\s*```/i);
+            if (codeBlockMatch) {
+                let jsonStr = codeBlockMatch[1];
+                jsonStr = this.cleanJsonArrays(jsonStr);
+                const parsed = JSON.parse(jsonStr);
+                
+                return {
+                    overallHealth: parsed.overallHealth || 'good',
+                    summary: parsed.summary || 'Technology stack analysis completed',
+                    strategicPriorities: parsed.strategicPriorities || [],
+                    riskAssessment: parsed.riskAssessment || {},
+                    quickWins: parsed.quickWins || [],
+                    longTermPlan: parsed.longTermPlan || [],
+                    budgetConsiderations: parsed.budgetConsiderations || '',
+                    teamImpact: parsed.teamImpact || '',
+                    architecturalInsights: parsed.architecturalInsights || '',
+                    isStructured: true
+                };
+            }
+            
+            throw new Error('No JSON found in response');
+        } catch (error) {
+            console.warn('Failed to parse overall analysis:', error);
+            console.warn('Response was:', response);
+            
+            // Instead of truncating, try to extract meaningful information
+            const healthPattern = /(excellent|good|concerning|critical)/i;
+            const healthMatch = response.match(healthPattern);
+            const detectedHealth = healthMatch ? healthMatch[1].toLowerCase() : 'good';
+            
+            return {
+                overallHealth: detectedHealth,
+                summary: response.replace(/```json|```|\{[\s\S]*\}/, '').trim() || 'AI analysis completed successfully. The system has analyzed your technology stack and provided recommendations for each component.',
+                isStructured: false
+            };
+        }
+    }
+    
+    displayOverallAnalysis(analysis) {
+        const recommendationsPanel = document.getElementById('aiRecommendations');
+        const content = document.getElementById('recommendationsContent');
+        
+        const healthColor = {
+            'excellent': '#10b981',
+            'good': '#3b82f6', 
+            'concerning': '#f59e0b',
+            'critical': '#ef4444',
+            'unknown': '#6b7280'
+        }[analysis.overallHealth] || '#6b7280';
+        
+        const healthIcon = {
+            'excellent': 'fas fa-check-circle',
+            'good': 'fas fa-thumbs-up',
+            'concerning': 'fas fa-exclamation-triangle', 
+            'critical': 'fas fa-exclamation-circle',
+            'unknown': 'fas fa-question-circle'
+        }[analysis.overallHealth] || 'fas fa-heartbeat';
+        
+        content.innerHTML = `
+            <div class="stack-health-display">
+                <div class="health-header">
+                    <div class="health-indicator" style="background-color: ${healthColor}">
+                        <i class="${healthIcon}"></i>
+                        <span class="health-status">${(analysis.overallHealth || 'unknown').toUpperCase()}</span>
+                    </div>
+                    <div class="health-meta">
+                        <span class="tech-count">${this.getFilteredTechData().length} Technologies Analyzed</span>
+                        <span class="analysis-time">${new Date().toLocaleDateString()}</span>
+                    </div>
+                </div>
+                
+                <div class="health-summary-section">
+                    <h3><i class="fas fa-clipboard-list"></i> Stack Health Summary</h3>
+                    <div class="summary-content">
+                        ${this.formatHealthSummary(analysis)}
+                    </div>
+                </div>
+                
+                <div class="analysis-footer">
+                    <div class="analysis-meta">
+                        <span class="ai-provider">🤖 Generated by Ollama Local AI (${this.localAI.defaultModel})</span>
+                        <span class="data-source">📊 Based on real API data</span>
+                    </div>
+                    <button class="re-analyze-btn" onclick="aiManager.aiAnalyzeAll()">
+                        <i class="fas fa-sync-alt"></i> Re-analyze Stack
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        recommendationsPanel.style.display = 'block';
+        recommendationsPanel.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    formatHealthSummary(analysis) {
+        if (!analysis.isStructured) {
+            // Fallback to simple summary for unstructured data
+            return `<p class="health-summary">${this.escapeHtml(analysis.summary)}</p>`;
+        }
+        
+        let html = `
+            <div class="formatted-health-summary">
+                <div class="main-summary">
+                    <p class="summary-text">${this.escapeHtml(analysis.summary)}</p>
+                </div>`;
+        
+        // Strategic Priorities Section
+        if (analysis.strategicPriorities && analysis.strategicPriorities.length > 0) {
+            html += `
+                <div class="summary-section">
+                    <h4><i class="fas fa-target"></i> Strategic Priorities</h4>
+                    <ul class="priority-list">
+                        ${analysis.strategicPriorities.map(priority => 
+                            `<li>${this.escapeHtml(priority)}</li>`
+                        ).join('')}
+                    </ul>
+                </div>`;
+        }
+        
+        // Risk Assessment Section
+        if (analysis.riskAssessment && Object.keys(analysis.riskAssessment).length > 0) {
+            html += `
+                <div class="summary-section">
+                    <h4><i class="fas fa-shield-alt"></i> Risk Assessment</h4>
+                    <div class="risk-grid">`;
+            
+            Object.entries(analysis.riskAssessment).forEach(([category, level]) => {
+                const riskColor = {
+                    'low': '#10b981',
+                    'medium': '#f59e0b', 
+                    'high': '#ef4444'
+                }[level] || '#6b7280';
+                
+                html += `
+                    <div class="risk-item">
+                        <span class="risk-category">${this.escapeHtml(category.charAt(0).toUpperCase() + category.slice(1))}</span>
+                        <span class="risk-level" style="background-color: ${riskColor}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;">
+                            ${this.escapeHtml(level.toUpperCase())}
+                        </span>
+                    </div>`;
+            });
+            
+            html += `
+                    </div>
+                </div>`;
+        }
+        
+        // Quick Wins Section
+        if (analysis.quickWins && analysis.quickWins.length > 0) {
+            html += `
+                <div class="summary-section">
+                    <h4><i class="fas fa-rocket"></i> Quick Wins</h4>
+                    <ul class="wins-list">
+                        ${analysis.quickWins.map(win => 
+                            `<li class="quick-win">${this.escapeHtml(win)}</li>`
+                        ).join('')}
+                    </ul>
+                </div>`;
+        }
+        
+        // Long Term Plan Section
+        if (analysis.longTermPlan && analysis.longTermPlan.length > 0) {
+            html += `
+                <div class="summary-section">
+                    <h4><i class="fas fa-road"></i> Long Term Roadmap</h4>
+                    <ul class="roadmap-list">
+                        ${analysis.longTermPlan.map(plan => 
+                            `<li class="roadmap-item">${this.escapeHtml(plan)}</li>`
+                        ).join('')}
+                    </ul>
+                </div>`;
+        }
+        
+        // Budget Considerations Section
+        if (analysis.budgetConsiderations) {
+            html += `
+                <div class="summary-section">
+                    <h4><i class="fas fa-dollar-sign"></i> Budget Considerations</h4>
+                    <p class="budget-info">${this.escapeHtml(analysis.budgetConsiderations)}</p>
+                </div>`;
+        }
+        
+        // Team Impact Section
+        if (analysis.teamImpact) {
+            html += `
+                <div class="summary-section">
+                    <h4><i class="fas fa-users"></i> Team Impact</h4>
+                    <p class="team-info">${this.escapeHtml(analysis.teamImpact)}</p>
+                </div>`;
+        }
+        
+        html += `</div>`;
+        return html;
     }
 
     generateOverallRecommendations() {
@@ -925,11 +3285,12 @@ class AITechStackManager {
     }
 
     calculateAIStats() {
+        const data = this.getFilteredTechData();
         return {
-            critical: this.techData.filter(t => t.aiPriority === 'critical').length,
-            recommended: this.techData.filter(t => t.aiPriority === 'high' || t.aiPriority === 'medium').length,
-            upToDate: this.techData.filter(t => t.aiPriority === 'low' || t.versionGap === 'up-to-date').length,
-            aiInsights: this.techData.filter(t => t.recommendations && t.recommendations.length > 0).length
+            critical: data.filter(t => t.aiPriority === 'critical').length,
+            recommended: data.filter(t => t.aiPriority === 'high' || t.aiPriority === 'medium').length,
+            upToDate: data.filter(t => t.aiPriority === 'low' || t.versionGap === 'up-to-date').length,
+            aiInsights: data.filter(t => t.recommendations && t.recommendations.length > 0).length
         };
     }
 
@@ -937,18 +3298,20 @@ class AITechStackManager {
         const container = document.getElementById('techGrid');
         container.innerHTML = '';
 
-        if (this.techData.length === 0) {
+        const filteredData = this.getFilteredTechData();
+        if (filteredData.length === 0) {
+            const productFilter = this.currentProductFilter;
             container.innerHTML = `
                 <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-secondary);">
                     <i class="fas fa-robot" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
-                    <p style="font-size: 1.2rem;">No technologies added yet.</p>
-                    <p>Add a technology above to get started with AI analysis!</p>
+                    <p style="font-size: 1.2rem;">No technologies ${productFilter ? `for ${productFilter}` : 'added yet'}.</p>
+                    <p>${productFilter ? 'Switch to "All Products" or add technologies for this product!' : 'Add a technology above to get started with AI analysis!'}</p>
                 </div>
             `;
             return;
         }
 
-        this.techData.forEach((item, index) => {
+        filteredData.forEach((item, index) => {
             const card = this.createAITechCard(item);
             card.style.animationDelay = `${index * 0.1}s`;
             container.appendChild(card);
@@ -974,7 +3337,7 @@ class AITechStackManager {
                 </div>
                 <div class="ai-badges">
                     <span class="ai-badge">🤖 AI Analyzed</span>
-                    ${item.environment ? `<span class="env-badge">${item.environment}</span>` : ''}
+                    ${item.product ? `<span class="product-badge">${item.product}</span>` : ''}
                 </div>
             </div>
             <div class="tech-card-body">
@@ -988,6 +3351,40 @@ class AITechStackManager {
                         <div class="version-value">${this.escapeHtml(item.latestVersion || 'Checking...')}</div>
                     </div>
                 </div>
+                
+                ${item.vulnerabilityCount !== undefined ? `
+                    <div class="security-info ${item.criticalVulns > 0 ? 'critical' : item.highVulns > 0 ? 'high' : 'secure'}">
+                        <div class="security-header">
+                            <i class="fas fa-shield-alt"></i>
+                            <span class="security-label">Security Status</span>
+                            <span class="security-score">Score: ${item.securityScore || 'N/A'}/100</span>
+                        </div>
+                        ${item.runtimeTechnology ? `
+                            <div class="security-status runtime">
+                                <i class="fas fa-info-circle"></i>
+                                Runtime/platform security managed by vendor
+                                <div class="runtime-note">Check EOL status and vendor security advisories</div>
+                            </div>
+                        ` : item.vulnerabilityCount === 0 ? `
+                            <div class="security-status secure">
+                                <i class="fas fa-check-circle"></i>
+                                No known vulnerabilities
+                            </div>
+                        ` : `
+                            <div class="vulnerability-summary">
+                                <div class="vuln-counts">
+                                    ${item.criticalVulns > 0 ? `<span class="vuln-count critical">${item.criticalVulns} Critical</span>` : ''}
+                                    ${item.highVulns > 0 ? `<span class="vuln-count high">${item.highVulns} High</span>` : ''}
+                                    <span class="vuln-total">${item.vulnerabilityCount} total vulnerabilities</span>
+                                </div>
+                                <button class="view-vulns-btn" onclick="aiManager.showVulnerabilityDetails('${item.id}')">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    View Details
+                                </button>
+                            </div>
+                        `}
+                    </div>
+                ` : ''}
                 
                 ${item.versionGap ? `
                     <div class="version-gap ${priorityClass}">
@@ -1005,6 +3402,7 @@ class AITechStackManager {
                         ${item.supportStatus && item.supportStatus !== item.eolDate ? `
                             <div class="support-info">Support: ${this.escapeHtml(item.supportStatus)}</div>
                         ` : ''}
+                        <!-- Debug info: Support Status = ${item.supportStatus || 'N/A'} -->
                     </div>
                 ` : ''}
                 
@@ -1097,7 +3495,59 @@ class AITechStackManager {
         const stored = localStorage.getItem('aiTechStackData');
         if (stored) {
             this.techData = JSON.parse(stored);
+            this.updateProductTabs();
         }
+    }
+
+    // Product tab methods
+    updateProductTabs() {
+        const tabsContainer = document.getElementById('productTabs');
+        const products = [...new Set(this.techData.map(tech => tech.product).filter(Boolean))].sort();
+        
+        // Clear existing tabs except "All Products"
+        tabsContainer.innerHTML = `
+            <button class="tab-button ${!this.currentProductFilter ? 'active' : ''}" data-product="" id="allProductsTab">
+                <i class="fas fa-layer-group"></i> All Products
+            </button>
+        `;
+        
+        // Add product tabs
+        products.forEach(product => {
+            const button = document.createElement('button');
+            button.className = `tab-button ${this.currentProductFilter === product ? 'active' : ''}`;
+            button.dataset.product = product;
+            button.innerHTML = `<i class="fas fa-cube"></i> ${product}`;
+            tabsContainer.appendChild(button);
+        });
+    }
+
+    switchToProduct(product) {
+        // Update active tab
+        document.querySelectorAll('.tab-button').forEach(tab => tab.classList.remove('active'));
+        const activeTab = document.querySelector(`[data-product="${product}"]`);
+        if (activeTab) activeTab.classList.add('active');
+        
+        // Update current filter
+        this.currentProductFilter = product;
+        
+        // Re-render data
+        this.renderTechCards();
+        this.renderStats();
+        
+        // Update AI Analysis button text to reflect current product
+        const aiButton = document.getElementById('aiAnalyzeAll');
+        if (product) {
+            aiButton.innerHTML = `<i class="fas fa-brain"></i> AI Analysis (${product})`;
+        } else {
+            aiButton.innerHTML = `<i class="fas fa-brain"></i> AI Analysis`;
+        }
+    }
+
+    getFilteredTechData() {
+        if (!this.currentProductFilter) {
+            return this.techData;
+        }
+        return this.techData.filter(tech => tech.product === this.currentProductFilter);
     }
 
     updateLastSync() {
@@ -1182,514 +3632,85 @@ class AITechStackManager {
             this.showError(`Failed to re-analyze: ${error.message}`);
         }
     }
+    
+    async showDetailedUpgradePlan(techId) {
+        const tech = this.techData.find(t => t.id === techId);
+        if (!tech) return;
+        
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'modal upgrade-plan-modal';
+        modal.innerHTML = `
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h2><i class="fas fa-route"></i> Detailed Upgrade Plan: ${tech.technology}</h2>
+                    <button class="close-btn" onclick="this.parentElement.parentElement.parentElement.remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="upgrade-loading">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>AI is creating your detailed upgrade plan...</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        try {
+            if (this.localAI.enabled && this.localAI.available) {
+                const upgradePlan = await this.generateOllamaUpgradePlan(tech);
+                this.displayUpgradePlan(modal, upgradePlan, tech);
+            } else {
+                // No fallback to predefined plans - require AI for detailed planning
+                this.displayNoAIUpgradePlan(modal, tech);
+            }
+        } catch (error) {
+            console.error('Failed to generate upgrade plan:', error);
+            this.displayUpgradePlanError(modal, tech, error.message);
+        }
+    }
 
     async showDetailedUpgradePlan(techId) {
         const tech = this.techData.find(t => t.id === techId);
         if (!tech) return;
-
-        this.showLoading(`Generating detailed upgrade plan for ${tech.technology}...`);
-
+        
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'modal upgrade-plan-modal';
+        modal.innerHTML = `
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h2><i class="fas fa-route"></i> Detailed Upgrade Plan: ${tech.technology}</h2>
+                    <button class="close-btn" onclick="this.parentElement.parentElement.parentElement.remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="upgrade-loading">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>AI is creating your detailed upgrade plan...</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
         try {
-            const upgradePlan = await this.generateDetailedUpgradePlan(tech);
-            this.hideLoading();
-            this.displayUpgradePlanModal(tech, upgradePlan);
+            if (this.localAI.enabled && this.localAI.available) {
+                const upgradePlan = await this.generateOllamaUpgradePlan(tech);
+                this.displayUpgradePlan(modal, upgradePlan, tech);
+            } else {
+                // No fallback to predefined plans - require AI for detailed planning
+                this.displayNoAIUpgradePlan(modal, tech);
+            }
         } catch (error) {
-            this.hideLoading();
-            this.showError(`Failed to generate upgrade plan: ${error.message}`);
+            console.error('Failed to generate upgrade plan:', error);
+            this.displayUpgradePlanError(modal, tech, error.message);
         }
-    }
-
-    async generateDetailedUpgradePlan(tech) {
-        const fromVersion = tech.currentVersion;
-        const toVersion = tech.latestVersion;
-        const techName = tech.technology.toLowerCase();
-
-        // Generate comprehensive upgrade plan based on technology
-        const plan = {
-            overview: '',
-            timeline: '',
-            phases: [],
-            risks: [],
-            testing: [],
-            rollback: [],
-            resources: [],
-            industryBestPractices: [],
-            microservicesConsiderations: []
-        };
-
-        if (techName.includes('java')) {
-            return this.generateJavaUpgradePlan(fromVersion, toVersion, tech);
-        } else if (techName.includes('node')) {
-            return this.generateNodeUpgradePlan(fromVersion, toVersion, tech);
-        } else if (techName.includes('react')) {
-            return this.generateReactUpgradePlan(fromVersion, toVersion, tech);
-        } else if (techName.includes('spring')) {
-            return this.generateSpringUpgradePlan(fromVersion, toVersion, tech);
-        } else if (techName.includes('python')) {
-            return this.generatePythonUpgradePlan(fromVersion, toVersion, tech);
-        } else {
-            return this.generateGenericUpgradePlan(fromVersion, toVersion, tech);
-        }
-    }
-
-    generateJavaUpgradePlan(fromVersion, toVersion, tech) {
-        const fromMajor = parseInt(fromVersion);
-        const toMajor = parseInt(toVersion);
-
-        return {
-            overview: `Comprehensive Java ${fromVersion} → ${toVersion} upgrade plan for distributed microservices architecture. This upgrade brings significant performance improvements, new language features, and long-term support benefits.`,
-            
-            timeline: `Estimated timeline: 8-12 weeks for complete migration across all microservices`,
-            
-            phases: [
-                {
-                    name: 'Phase 1: Environment Preparation (Week 1-2)',
-                    tasks: [
-                        'Set up Java 21 development environments for all developers',
-                        'Update CI/CD pipelines to support Java 21',
-                        'Create isolated staging environment with Java 21',
-                        'Audit all dependencies for Java 21 compatibility',
-                        'Update build tools (Maven/Gradle) to latest versions',
-                        'Test basic application startup in new environment'
-                    ]
-                },
-                {
-                    name: 'Phase 2: Dependency & Code Analysis (Week 2-3)',
-                    tasks: [
-                        'Run dependency compatibility checks using Maven/Gradle plugins',
-                        'Identify deprecated APIs and language features',
-                        'Review third-party library versions and update plans',
-                        'Analyze performance-critical code for optimization opportunities',
-                        'Create migration checklist for each microservice',
-                        'Document breaking changes and required code modifications'
-                    ]
-                },
-                {
-                    name: 'Phase 3: Pilot Service Migration (Week 4-5)',
-                    tasks: [
-                        'Select least critical microservice as pilot',
-                        'Perform complete migration of pilot service',
-                        'Implement comprehensive testing suite for pilot',
-                        'Monitor performance metrics and memory usage',
-                        'Validate inter-service communication works correctly',
-                        'Document lessons learned and refine process'
-                    ]
-                },
-                {
-                    name: 'Phase 4: Core Services Migration (Week 6-8)',
-                    tasks: [
-                        'Migrate core business logic services in priority order',
-                        'Implement blue-green deployment strategy',
-                        'Run parallel testing (old vs new Java versions)',
-                        'Monitor application performance and error rates',
-                        'Validate database connections and persistence layers',
-                        'Test service mesh and load balancing configurations'
-                    ]
-                },
-                {
-                    name: 'Phase 5: Full Production Rollout (Week 9-12)',
-                    tasks: [
-                        'Complete migration of remaining services',
-                        'Perform end-to-end system testing',
-                        'Conduct load testing and performance validation',
-                        'Execute disaster recovery procedures',
-                        'Monitor production metrics for 2 weeks',
-                        'Decommission old Java 17 environments'
-                    ]
-                }
-            ],
-            
-            risks: [
-                {
-                    risk: 'Service compatibility issues between Java versions',
-                    mitigation: 'Implement version-agnostic APIs and maintain backward compatibility during transition'
-                },
-                {
-                    risk: 'Memory usage changes affecting container resource allocation',
-                    mitigation: 'Perform memory profiling and adjust Kubernetes resource limits accordingly'
-                },
-                {
-                    risk: 'Third-party library incompatibilities',
-                    mitigation: 'Test all integrations in isolation and have rollback plans for each service'
-                },
-                {
-                    risk: 'Performance regressions in production',
-                    mitigation: 'Implement comprehensive monitoring and automated rollback triggers'
-                }
-            ],
-            
-            testing: [
-                'Unit tests with both Java 17 and 21 (parallel testing)',
-                'Integration testing across all microservice boundaries',
-                'Performance benchmarking (latency, throughput, memory)',
-                'Load testing with production-like traffic patterns',
-                'Chaos engineering to test failure scenarios',
-                'Security testing for new Java 21 features',
-                'End-to-end user journey testing'
-            ],
-            
-            rollback: [
-                'Maintain Java 17 container images as backup',
-                'Implement feature flags for gradual rollout',
-                'Use blue-green deployment with instant switchback capability',
-                'Database schema compatibility maintained during transition',
-                'Automated monitoring triggers for performance degradation',
-                'Pre-approved rollback procedures for each service tier'
-            ],
-            
-            resources: [
-                'Oracle Java 21 Migration Guide: https://docs.oracle.com/en/java/javase/21/migrate/',
-                'Spring Boot 3.x Java 21 compatibility guide',
-                'Micrometer metrics for Java 21 performance monitoring',
-                'Docker base images: openjdk:21-jre-slim',
-                'Gradle/Maven plugins for Java 21 compatibility checking'
-            ],
-            
-            industryBestPractices: [
-                '🏢 Netflix: Gradual rollout using canary deployments with 1% → 10% → 50% → 100% traffic',
-                '🏢 Spotify: Service-by-service migration with comprehensive A/B testing',
-                '🏢 Uber: Blue-green deployment with automated performance validation',
-                '🏢 LinkedIn: Parallel running environments for 2 weeks before cutover',
-                '🏢 Amazon: Feature flags for gradual enablement of Java 21 features',
-                '🏢 Google: Extensive integration testing with downstream services',
-                '🚀 Key Learning: Always migrate non-critical services first to validate process'
-            ],
-            
-            microservicesConsiderations: [
-                {
-                    aspect: 'Service Discovery',
-                    consideration: 'Ensure service discovery works with both Java versions during transition',
-                    action: 'Test Consul/Eureka compatibility and update health check endpoints'
-                },
-                {
-                    aspect: 'Circuit Breakers',
-                    consideration: 'Monitor circuit breaker patterns for changes in service behavior',
-                    action: 'Adjust Hystrix/Resilience4j timeouts based on Java 21 performance characteristics'
-                },
-                {
-                    aspect: 'Distributed Tracing',
-                    consideration: 'Validate tracing continues to work across version boundaries',
-                    action: 'Update Zipkin/Jaeger configurations for Java 21 virtual threads'
-                },
-                {
-                    aspect: 'Container Orchestration',
-                    consideration: 'Kubernetes resource requests/limits may need adjustment',
-                    action: 'Monitor memory and CPU usage patterns, update pod specifications'
-                },
-                {
-                    aspect: 'API Gateway',
-                    consideration: 'Load balancing between different Java versions during migration',
-                    action: 'Configure weighted routing in Kong/Zuul for gradual traffic shift'
-                },
-                {
-                    aspect: 'Data Consistency',
-                    consideration: 'Ensure database connections and transactions work consistently',
-                    action: 'Test connection pooling and transaction boundaries across services'
-                }
-            ]
-        };
-    }
-
-    generateNodeUpgradePlan(fromVersion, toVersion, tech) {
-        return {
-            overview: `Node.js ${fromVersion} → ${toVersion} migration plan for microservices architecture with focus on performance gains and security improvements.`,
-            timeline: `Estimated timeline: 6-8 weeks for complete ecosystem migration`,
-            phases: [
-                {
-                    name: 'Phase 1: Dependency Analysis (Week 1)',
-                    tasks: [
-                        'Audit npm packages for Node.js compatibility',
-                        'Update package.json engines field',
-                        'Test critical dependencies in Node.js environment',
-                        'Review native modules for rebuild requirements'
-                    ]
-                },
-                {
-                    name: 'Phase 2: Development Environment (Week 2-3)',
-                    tasks: [
-                        'Update Docker base images to Node.js',
-                        'Configure CI/CD pipelines for new Node version',
-                        'Update local development environments',
-                        'Test application startup and basic functionality'
-                    ]
-                },
-                {
-                    name: 'Phase 3: Service Migration (Week 4-6)',
-                    tasks: [
-                        'Migrate services in dependency order',
-                        'Implement blue-green deployment',
-                        'Monitor performance metrics',
-                        'Validate inter-service communication'
-                    ]
-                },
-                {
-                    name: 'Phase 4: Production Deployment (Week 7-8)',
-                    tasks: [
-                        'Full production rollout',
-                        'Performance monitoring and optimization',
-                        'Security audit and testing',
-                        'Documentation and team training'
-                    ]
-                }
-            ],
-            risks: [
-                { risk: 'npm package incompatibilities', mitigation: 'Comprehensive dependency testing and fallback versions' },
-                { risk: 'Native module compilation issues', mitigation: 'Pre-compile modules and test on target architecture' },
-                { risk: 'Performance characteristics changes', mitigation: 'Extensive load testing and monitoring' }
-            ],
-            testing: ['Unit tests with new Node.js version', 'npm audit for security vulnerabilities', 'Load testing with realistic traffic'],
-            rollback: ['Maintain previous Node.js container images', 'Feature flags for gradual rollout', 'Automated rollback triggers'],
-            resources: ['Node.js migration guide', 'npm compatibility checker', 'Performance monitoring tools'],
-            industryBestPractices: [
-                '🏢 Airbnb: Gradual migration with comprehensive testing',
-                '🏢 WhatsApp: Blue-green deployment with instant rollback',
-                '🏢 PayPal: Service-by-service approach with monitoring'
-            ],
-            microservicesConsiderations: [
-                { aspect: 'Event Loop', consideration: 'Monitor event loop lag in new version', action: 'Update monitoring dashboards' },
-                { aspect: 'Memory Usage', consideration: 'V8 engine changes may affect memory patterns', action: 'Adjust container limits' }
-            ]
-        };
-    }
-
-    generateReactUpgradePlan(fromVersion, toVersion, tech) {
-        return {
-            overview: `React ${fromVersion} → ${toVersion} upgrade focusing on modern features and performance improvements in micro-frontend architecture.`,
-            timeline: `Estimated timeline: 4-6 weeks for complete frontend migration`,
-            phases: [
-                {
-                    name: 'Phase 1: Preparation (Week 1)',
-                    tasks: [
-                        'Audit component library for breaking changes',
-                        'Update build tools and webpack configuration',
-                        'Review React Router and state management compatibility',
-                        'Test critical user flows in new React version'
-                    ]
-                },
-                {
-                    name: 'Phase 2: Component Migration (Week 2-3)',
-                    tasks: [
-                        'Migrate shared components first',
-                        'Update hooks and lifecycle methods',
-                        'Test component rendering and performance',
-                        'Validate micro-frontend integration points'
-                    ]
-                },
-                {
-                    name: 'Phase 3: Feature Testing (Week 4)',
-                    tasks: [
-                        'End-to-end testing of all features',
-                        'Performance testing and optimization',
-                        'Cross-browser compatibility testing',
-                        'Accessibility audit'
-                    ]
-                },
-                {
-                    name: 'Phase 4: Production Deployment (Week 5-6)',
-                    tasks: [
-                        'Canary deployment to subset of users',
-                        'Monitor user metrics and error rates',
-                        'Full production rollout',
-                        'Performance monitoring and optimization'
-                    ]
-                }
-            ],
-            risks: [
-                { risk: 'Component breaking changes', mitigation: 'Comprehensive component testing and fallback implementations' },
-                { risk: 'Bundle size increases', mitigation: 'Bundle analysis and tree-shaking optimization' },
-                { risk: 'Performance regressions', mitigation: 'React DevTools profiling and optimization' }
-            ],
-            testing: ['Component unit tests', 'Integration testing', 'Visual regression testing', 'Performance benchmarking'],
-            rollback: ['Previous build artifacts maintained', 'Feature flags for component switching', 'CDN rollback capability'],
-            resources: ['React migration guide', 'React DevTools', 'Bundle analyzer tools'],
-            industryBestPractices: [
-                '🏢 Facebook: Incremental migration with codemods',
-                '🏢 Netflix: Feature flag driven rollout',
-                '🏢 Spotify: Micro-frontend approach for gradual migration'
-            ],
-            microservicesConsiderations: [
-                { aspect: 'Micro-frontends', consideration: 'Ensure compatibility across micro-frontend boundaries', action: 'Test module federation' },
-                { aspect: 'State Management', consideration: 'Redux/Context API changes', action: 'Validate state synchronization' }
-            ]
-        };
-    }
-
-    generateGenericUpgradePlan(fromVersion, toVersion, tech) {
-        return {
-            overview: `${tech.technology} upgrade from ${fromVersion} to ${toVersion} with focus on distributed systems best practices.`,
-            timeline: `Estimated timeline: 6-10 weeks depending on complexity`,
-            phases: [
-                {
-                    name: 'Phase 1: Analysis & Planning (Week 1-2)',
-                    tasks: [
-                        'Analyze current usage and dependencies',
-                        'Review release notes and breaking changes',
-                        'Plan migration strategy',
-                        'Set up test environments'
-                    ]
-                },
-                {
-                    name: 'Phase 2: Development & Testing (Week 3-5)',
-                    tasks: [
-                        'Implement changes in development environment',
-                        'Update configurations and dependencies',
-                        'Comprehensive testing',
-                        'Performance validation'
-                    ]
-                },
-                {
-                    name: 'Phase 3: Production Deployment (Week 6-8)',
-                    tasks: [
-                        'Staged production rollout',
-                        'Monitor system metrics',
-                        'Validate functionality',
-                        'Full deployment completion'
-                    ]
-                }
-            ],
-            risks: [
-                { risk: 'Compatibility issues', mitigation: 'Thorough testing and rollback plans' },
-                { risk: 'Performance impacts', mitigation: 'Monitoring and optimization' }
-            ],
-            testing: ['Functional testing', 'Performance testing', 'Integration testing'],
-            rollback: ['Previous version backup', 'Rollback procedures', 'Monitoring triggers'],
-            resources: ['Official documentation', 'Community guides', 'Support channels'],
-            industryBestPractices: [
-                '🏢 Industry standard: Phased rollout approach',
-                '🏢 Best practice: Comprehensive testing strategy',
-                '🏢 Recommendation: Monitoring and observability'
-            ],
-            microservicesConsiderations: [
-                { aspect: 'Service Integration', consideration: 'Ensure service boundaries remain intact', action: 'Test all integrations' },
-                { aspect: 'Deployment', consideration: 'Coordinate deployment across services', action: 'Use deployment orchestration' }
-            ]
-        };
-    }
-
-    generateSpringUpgradePlan(fromVersion, toVersion, tech) {
-        return {
-            overview: `Spring Boot ${fromVersion} → ${toVersion} enterprise migration plan for microservices ecosystem with focus on reactive programming and performance.`,
-            timeline: `Estimated timeline: 10-14 weeks for enterprise-grade migration`,
-            phases: [
-                {
-                    name: 'Phase 1: Framework Analysis (Week 1-2)',
-                    tasks: [
-                        'Audit Spring dependencies and compatibility matrix',
-                        'Review configuration changes and deprecated features',
-                        'Analyze security framework updates',
-                        'Test data access layer compatibility'
-                    ]
-                },
-                {
-                    name: 'Phase 2: Core Services Migration (Week 3-6)',
-                    tasks: [
-                        'Migrate shared libraries and common components',
-                        'Update Spring Security configurations',
-                        'Migrate data access patterns to new version',
-                        'Test reactive programming enhancements'
-                    ]
-                },
-                {
-                    name: 'Phase 3: Service Integration (Week 7-10)',
-                    tasks: [
-                        'Migrate business services in dependency order',
-                        'Update service discovery and configuration',
-                        'Test distributed tracing and monitoring',
-                        'Validate API gateway integration'
-                    ]
-                },
-                {
-                    name: 'Phase 4: Production Rollout (Week 11-14)',
-                    tasks: [
-                        'Canary deployment with traffic splitting',
-                        'Monitor application metrics and performance',
-                        'Validate security and compliance requirements',
-                        'Complete production migration'
-                    ]
-                }
-            ],
-            risks: [
-                { risk: 'Spring Security breaking changes', mitigation: 'Comprehensive security testing and configuration validation' },
-                { risk: 'Data access layer changes', mitigation: 'Database integration testing and transaction boundary validation' },
-                { risk: 'Actuator endpoint changes', mitigation: 'Update monitoring and health check configurations' }
-            ],
-            testing: ['Spring Boot Test slices', 'Integration testing with TestContainers', 'Security testing', 'Performance benchmarking'],
-            rollback: ['Previous Spring Boot artifacts', 'Database migration rollback scripts', 'Configuration rollback procedures'],
-            resources: ['Spring Boot Migration Guide', 'Spring Security documentation', 'Spring Cloud compatibility matrix'],
-            industryBestPractices: [
-                '🏢 Pivotal/VMware: Service-by-service migration approach',
-                '🏢 Netflix: Eureka and Hystrix integration patterns',
-                '🏢 Zalando: API-first approach with Spring Cloud Gateway'
-            ],
-            microservicesConsiderations: [
-                { aspect: 'Service Discovery', consideration: 'Spring Cloud service registry changes', action: 'Update Eureka/Consul configuration' },
-                { aspect: 'Configuration Management', consideration: 'Spring Cloud Config server compatibility', action: 'Test configuration refresh mechanisms' },
-                { aspect: 'Circuit Breakers', consideration: 'Hystrix to Resilience4j migration', action: 'Update circuit breaker patterns' }
-            ]
-        };
-    }
-
-    generatePythonUpgradePlan(fromVersion, toVersion, tech) {
-        return {
-            overview: `Python ${fromVersion} → ${toVersion} migration plan for distributed microservices with focus on performance improvements and new language features.`,
-            timeline: `Estimated timeline: 8-10 weeks for complete ecosystem migration`,
-            phases: [
-                {
-                    name: 'Phase 1: Environment Setup (Week 1-2)',
-                    tasks: [
-                        'Set up Python virtual environments for new version',
-                        'Audit requirements.txt for package compatibility',
-                        'Test critical dependencies and frameworks',
-                        'Update CI/CD pipelines for new Python version'
-                    ]
-                },
-                {
-                    name: 'Phase 2: Code Migration (Week 3-5)',
-                    tasks: [
-                        'Run 2to3 or pyupgrade for syntax updates',
-                        'Update deprecated function calls and imports',
-                        'Test async/await patterns and asyncio changes',
-                        'Validate type hints and mypy compatibility'
-                    ]
-                },
-                {
-                    name: 'Phase 3: Service Testing (Week 6-7)',
-                    tasks: [
-                        'Unit and integration testing with new Python version',
-                        'Performance benchmarking and optimization',
-                        'Test web framework compatibility (Django/Flask/FastAPI)',
-                        'Validate database drivers and ORM compatibility'
-                    ]
-                },
-                {
-                    name: 'Phase 4: Production Deployment (Week 8-10)',
-                    tasks: [
-                        'Container image updates with new Python version',
-                        'Blue-green deployment across microservices',
-                        'Monitor application performance and memory usage',
-                        'Complete production migration and cleanup'
-                    ]
-                }
-            ],
-            risks: [
-                { risk: 'Package incompatibilities', mitigation: 'Pin package versions and test extensively' },
-                { risk: 'Performance characteristics changes', mitigation: 'Benchmark critical code paths' },
-                { risk: 'Breaking changes in standard library', mitigation: 'Comprehensive testing and code review' }
-            ],
-            testing: ['pytest with new Python version', 'tox for multi-version testing', 'Performance profiling', 'Security scanning'],
-            rollback: ['Previous Python container images', 'Virtual environment snapshots', 'Package requirement locks'],
-            resources: ['Python migration guide', 'What\'s New in Python documentation', 'PyPI compatibility checker'],
-            industryBestPractices: [
-                '🏢 Instagram: Gradual migration with extensive A/B testing',
-                '🏢 Dropbox: Service-by-service approach with monitoring',
-                '🏢 Pinterest: Blue-green deployment with automated rollback'
-            ],
-            microservicesConsiderations: [
-                { aspect: 'WSGI/ASGI', consideration: 'Web server compatibility with new Python version', action: 'Test Gunicorn/uWSGI configurations' },
-                { aspect: 'Message Queues', consideration: 'Celery and RabbitMQ/Redis compatibility', action: 'Validate async task processing' },
-                { aspect: 'Database Connections', consideration: 'SQLAlchemy and database driver updates', action: 'Test connection pooling and migrations' }
-            ]
-        };
     }
 
     displayUpgradePlanModal(tech, plan) {
@@ -1707,10 +3728,10 @@ class AITechStackManager {
                 <div class="upgrade-plan-body">
                     <div class="plan-overview">
                         <h3>📋 Overview</h3>
-                        <p>${plan.overview}</p>
+                        <p>${plan.overview || 'No overview provided.'}</p>
                         <div class="timeline-badge">
                             <i class="fas fa-clock"></i>
-                            ${plan.timeline}
+                            ${plan.timeline || 'Timeline not specified'}
                         </div>
                     </div>
                     
@@ -1739,27 +3760,27 @@ class AITechStackManager {
                     <div class="plan-testing">
                         <h3>🧪 Testing Strategy</h3>
                         <ul>
-                            ${plan.testing.map(test => `<li>${test}</li>`).join('')}
+                            ${(plan.testing || []).map(test => `<li>${test}</li>`).join('')}
                         </ul>
                     </div>
                     
                     <div class="plan-rollback">
                         <h3>🔄 Rollback Strategy</h3>
                         <ul>
-                            ${plan.rollback.map(item => `<li>${item}</li>`).join('')}
+                            ${(plan.rollback || []).map(item => `<li>${item}</li>`).join('')}
                         </ul>
                     </div>
                     
                     <div class="plan-industry">
                         <h3>🏢 Industry Best Practices</h3>
                         <ul>
-                            ${plan.industryBestPractices.map(practice => `<li>${practice}</li>`).join('')}
+                            ${(plan.industryBestPractices || []).map(practice => `<li>${practice}</li>`).join('')}
                         </ul>
                     </div>
                     
                     <div class="plan-microservices">
                         <h3>🔧 Microservices Considerations</h3>
-                        ${plan.microservicesConsiderations.map(consideration => `
+                        ${(plan.microservicesConsiderations || []).map(consideration => `
                             <div class="microservice-item">
                                 <div class="ms-aspect">${consideration.aspect}</div>
                                 <div class="ms-consideration">${consideration.consideration}</div>
@@ -1771,7 +3792,7 @@ class AITechStackManager {
                     <div class="plan-resources">
                         <h3>📚 Resources & Documentation</h3>
                         <ul>
-                            ${plan.resources.map(resource => `<li>${resource}</li>`).join('')}
+                            ${(plan.resources || []).map(resource => `<li>${resource}</li>`).join('')}
                         </ul>
                     </div>
                 </div>
@@ -1885,7 +3906,7 @@ class AITechStackManager {
         this.hideLoading();
         
         // Show success message
-        this.showSuccess('All technologies have been removed successfully.');
+        this.showMessage('All technologies have been removed successfully.', 'success');
         
         // Optional: Show empty state message
         setTimeout(() => {
@@ -1939,6 +3960,186 @@ class AITechStackManager {
 
     hideImportModal() {
         document.getElementById('importModal').style.display = 'none';
+    }
+
+    showVulnerabilityDetails(techId) {
+        const tech = this.techData.find(t => t.id === techId);
+        if (!tech || !tech.vulnerabilities) {
+            this.showMessage('No vulnerability data available for this technology', 'info');
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal vulnerability-modal';
+        modal.innerHTML = `
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h3>🛡️ Security Vulnerabilities: ${this.escapeHtml(tech.technology)}</h3>
+                    <span class="close-modal" onclick="aiManager.closeModal(this)">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="vulnerability-overview">
+                        <div class="security-summary">
+                            <div class="security-score-display">
+                                <div class="score-circle ${tech.securityScore >= 80 ? 'good' : tech.securityScore >= 60 ? 'warning' : 'critical'}">
+                                    <div class="score-value">${tech.securityScore || 0}</div>
+                                    <div class="score-label">Security Score</div>
+                                </div>
+                            </div>
+                            <div class="vulnerability-stats">
+                                <div class="stat-item critical">
+                                    <div class="stat-count">${tech.criticalVulns || 0}</div>
+                                    <div class="stat-label">Critical</div>
+                                </div>
+                                <div class="stat-item high">
+                                    <div class="stat-count">${tech.highVulns || 0}</div>
+                                    <div class="stat-label">High</div>
+                                </div>
+                                <div class="stat-item medium">
+                                    <div class="stat-count">${tech.vulnerabilities.filter(v => v.severity === 'medium').length || 0}</div>
+                                    <div class="stat-label">Medium</div>
+                                </div>
+                                <div class="stat-item low">
+                                    <div class="stat-count">${tech.vulnerabilities.filter(v => v.severity === 'low').length || 0}</div>
+                                    <div class="stat-label">Low</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tech-info">
+                            <div class="tech-version">
+                                <strong>${this.escapeHtml(tech.technology)} v${this.escapeHtml(tech.currentVersion)}</strong>
+                            </div>
+                            <div class="last-checked">
+                                Last checked: ${new Date(tech.lastSecurityCheck).toLocaleDateString()}
+                            </div>
+                        </div>
+                    </div>
+
+                    ${tech.vulnerabilities.length === 0 ? `
+                        <div class="no-vulnerabilities">
+                            <i class="fas fa-shield-alt"></i>
+                            <h4>No Known Vulnerabilities</h4>
+                            <p>This version appears to be secure with no known vulnerabilities in our database.</p>
+                        </div>
+                    ` : `
+                        <div class="vulnerabilities-list">
+                            <div class="list-header">
+                                <h4>Vulnerability Details</h4>
+                                <div class="filter-buttons">
+                                    <button class="filter-btn active" onclick="aiManager.filterVulnerabilities('all')">All</button>
+                                    <button class="filter-btn" onclick="aiManager.filterVulnerabilities('critical')">Critical</button>
+                                    <button class="filter-btn" onclick="aiManager.filterVulnerabilities('high')">High</button>
+                                </div>
+                            </div>
+                            <div class="vulnerabilities-container">
+                                ${tech.vulnerabilities.map(vuln => `
+                                    <div class="vulnerability-item" data-severity="${vuln.severity}">
+                                        <div class="vuln-header">
+                                            <div class="vuln-id">
+                                                <strong>${this.escapeHtml(vuln.id)}</strong>
+                                                <span class="severity-badge ${vuln.severity}">${vuln.severity.toUpperCase()}</span>
+                                            </div>
+                                            <div class="vuln-date">
+                                                ${vuln.published ? new Date(vuln.published).toLocaleDateString() : 'Unknown date'}
+                                            </div>
+                                        </div>
+                                        <div class="vuln-summary">
+                                            ${this.escapeHtml(vuln.summary)}
+                                        </div>
+                                        ${vuln.aliases && vuln.aliases.length > 0 ? `
+                                            <div class="vuln-aliases">
+                                                <strong>Also known as:</strong> ${vuln.aliases.map(alias => this.escapeHtml(alias)).join(', ')}
+                                            </div>
+                                        ` : ''}
+                                        ${vuln.references && vuln.references.length > 0 ? `
+                                            <div class="vuln-references">
+                                                <strong>References:</strong>
+                                                ${vuln.references.slice(0, 3).map(ref => `
+                                                    <a href="${ref.url}" target="_blank" class="ref-link">
+                                                        ${ref.type || 'Reference'} <i class="fas fa-external-link-alt"></i>
+                                                    </a>
+                                                `).join('')}
+                                                ${vuln.references.length > 3 ? `<span class="more-refs">+${vuln.references.length - 3} more</span>` : ''}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `}
+
+                    <div class="vulnerability-actions">
+                        <button class="btn-primary" onclick="aiManager.refreshVulnerabilityData('${tech.id}')">
+                            <i class="fas fa-sync-alt"></i> Refresh Security Data
+                        </button>
+                        <button class="btn-secondary" onclick="aiManager.closeModal(this)">
+                            <i class="fas fa-times"></i> Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        modal.style.display = 'flex';
+    }
+
+    filterVulnerabilities(severity) {
+        const vulnerabilityItems = document.querySelectorAll('.vulnerability-item');
+        const filterButtons = document.querySelectorAll('.filter-btn');
+
+        // Update active button
+        filterButtons.forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+
+        // Filter vulnerabilities
+        vulnerabilityItems.forEach(item => {
+            if (severity === 'all' || item.dataset.severity === severity) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+
+    async refreshVulnerabilityData(techId) {
+        const tech = this.techData.find(t => t.id === techId);
+        if (!tech) return;
+
+        try {
+            this.showMessage('Refreshing vulnerability data...', 'info');
+            
+            const vulnInfo = await this.checkVulnerabilities(tech.technology, tech.currentVersion, tech.detectedType);
+            if (vulnInfo) {
+                tech.vulnerabilities = vulnInfo.vulnerabilities;
+                tech.vulnerabilityCount = vulnInfo.count;
+                tech.criticalVulns = vulnInfo.critical;
+                tech.highVulns = vulnInfo.high;
+                tech.securityScore = vulnInfo.securityScore;
+                tech.lastSecurityCheck = new Date().toISOString();
+                
+                this.saveData();
+                this.renderTechCards();
+                this.closeModal(document.querySelector('.vulnerability-modal'));
+                this.showMessage('Vulnerability data updated successfully', 'success');
+            } else {
+                this.showMessage('Could not retrieve vulnerability data', 'warning');
+            }
+        } catch (error) {
+            this.showMessage('Failed to refresh vulnerability data', 'error');
+            console.error('Vulnerability refresh error:', error);
+        }
+    }
+
+    closeModal(element) {
+        // Find the modal container and remove it
+        let modal = element;
+        while (modal && !modal.classList.contains('modal')) {
+            modal = modal.parentElement;
+        }
+        if (modal) {
+            modal.remove();
+        }
     }
 
     hideRecommendations() {
@@ -2214,6 +4415,431 @@ class AITechStackManager {
             console.warn('Background sync failed:', error);
         }
     }
+
+    // Local AI Integration Methods
+    async initializeLocalAI() {
+        try {
+            const response = await fetch(`${this.localAI.ollamaURL}/api/tags`, {
+                signal: AbortSignal.timeout(2000)
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const models = data.models || [];
+                this.localAI.available = models.some(model => 
+                    model.name.includes('llama') || model.name.includes('mistral')
+                );
+                
+                if (this.localAI.available && !this.localAI.enabled) {
+                    this.showLocalAIPrompt();
+                } else if (this.localAI.available && this.localAI.enabled) {
+                    this.showAIStatus('🤖 Local AI Ready (Ollama)');
+                }
+            }
+        } catch (error) {
+            this.localAI.available = false;
+            if (this.localAI.enabled) {
+                this.showAIStatus('⚠️ Ollama not running - using rule-based analysis');
+            }
+        }
+    }
+
+    showLocalAIPrompt() {
+        const notification = document.createElement('div');
+        notification.className = 'ai-notification';
+        notification.innerHTML = `
+            <div class="notification-content">
+                <div class="notification-icon">🤖</div>
+                <div class="notification-text">
+                    <h4>Local AI Available!</h4>
+                    <p>Ollama detected. Enable local AI for enhanced analysis?</p>
+                </div>
+                <div class="notification-actions">
+                    <button onclick="aiManager.enableLocalAI()" class="btn-primary btn-sm">
+                        Enable AI
+                    </button>
+                    <button onclick="this.parentElement.parentElement.remove()" class="btn-secondary btn-sm">
+                        Maybe Later
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 10 seconds if no action
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 10000);
+    }
+
+    enableLocalAI() {
+        this.localAI.enabled = true;
+        localStorage.setItem('localAI_enabled', 'true');
+        this.showAIStatus('🤖 Local AI Enabled!');
+        
+        // Remove any existing notifications
+        document.querySelectorAll('.ai-notification').forEach(el => el.remove());
+        
+        // Re-analyze existing technologies with AI
+        if (this.techData.length > 0) {
+            this.showConfirmAIReanalysis();
+        }
+    }
+
+    showConfirmAIReanalysis() {
+        if (confirm('Re-analyze existing technologies with local AI? This will provide enhanced insights.')) {
+            this.aiAnalyzeAll();
+        }
+    }
+
+    async performOllamaAnalysis(techData, knownTech) {
+        try {
+            const prompt = this.buildOllamaPrompt(techData, knownTech);
+            
+            const response = await fetch(`${this.localAI.ollamaURL}/api/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: this.localAI.defaultModel,
+                    prompt: prompt,
+                    stream: false,
+                    options: {
+                        temperature: 0.3,
+                        num_ctx: 4096
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Ollama API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return this.parseOllamaResponse(data.response, techData, knownTech);
+
+        } catch (error) {
+            console.warn('Ollama analysis failed:', error);
+            this.localAI.available = false;
+            throw error;
+        }
+    }
+
+    buildOllamaPrompt(techData, knownTech) {
+        const versionContext = this.buildVersionContext(techData);
+        const vulnerabilityContext = this.buildVulnerabilityContext(techData);
+        
+        return `You are a DevOps expert analyzing a technology stack component. Provide specific, actionable analysis.
+
+TECHNOLOGY: ${techData.technology}
+CURRENT VERSION: ${techData.currentVersion}
+LATEST VERSION: ${techData.latestVersion || 'Unknown'}
+CATEGORY: ${knownTech?.category || 'Unknown'}
+EOL DATE: ${techData.eolDate || 'Unknown'}
+ENVIRONMENT: ${techData.environment || 'Not specified'}
+
+${versionContext}
+
+${vulnerabilityContext}
+
+Analyze this technology and respond with JSON in this exact format:
+{
+  "priority": "critical|high|medium|low",
+  "summary": "One sentence summary of the current state",
+  "recommendations": [
+    "Specific recommendation 1",
+    "Specific recommendation 2", 
+    "Specific recommendation 3"
+  ],
+  "risks": [
+    "Security or compatibility risk",
+    "Performance or maintenance risk"
+  ],
+  "nextSteps": [
+    "Immediate action to take",
+    "Planning step",
+    "Implementation milestone"
+  ],
+  "urgency": "Timeframe for action (e.g., '2-4 weeks', 'next quarter')",
+  "complexity": "low|medium|high"
+}
+
+CRITICAL RULES:
+- NEVER INVENT VERSION NUMBERS: Only use versions explicitly listed above
+- CURRENT VERSION: ${techData.currentVersion} - LATEST VERSION: ${techData.latestVersion || 'Unknown'}
+- If suggesting upgrades, use ONLY the LATEST VERSION number provided
+- If LATEST VERSION is "Unknown", use phrases like "latest stable version" NOT specific numbers
+- FORBIDDEN: Do not suggest version 27, 25+, 26+, or any version not explicitly provided
+- Only recommend upgrades to NEWER versions, never suggest downgrading to older versions
+- Understand version chronology and semantic versioning (higher numbers are typically newer)
+- When suggesting version changes, ensure they represent actual improvements (security, features, performance)
+- If downgrading is absolutely necessary due to compatibility issues, clearly explain why
+- SECURITY PRIORITY: If there are Critical vulnerabilities, set priority to "critical" and urgency to immediate
+- SECURITY PRIORITY: If there are High vulnerabilities, set priority to "high" and address urgently
+- Factor security vulnerabilities heavily into risk assessment and upgrade urgency
+
+Focus on:
+- Security implications of the current version
+- Performance benefits of upgrading to newer (not older) versions
+- Compatibility concerns with modern libraries
+- Enterprise/production considerations
+- Specific migration steps that make logical sense
+
+Be concise but specific about versions and provide actionable steps.`;
+    }
+
+    buildVersionContext(techData) {
+        const currentVersion = techData.currentVersion;
+        const latestVersion = techData.latestVersion;
+        
+        let context = `CONTEXT: Currently running ${techData.technology} version ${currentVersion}.`;
+        
+        if (latestVersion && latestVersion !== 'Unknown') {
+            context += ` Latest available version is ${latestVersion}.`;
+            context += ` CONSTRAINT: You must ONLY recommend upgrading to version ${latestVersion}. Do not suggest any other version numbers.`;
+        } else {
+            context += ` Latest version is unknown - CONSTRAINT: You must NOT suggest any specific version numbers.`;
+        }
+        
+        context += ` Always recommend upgrading to newer versions for better security, performance, and features. Never suggest downgrading to older versions unless there are critical compatibility issues that cannot be resolved otherwise.`;
+        
+        return context;
+    }
+
+    parseOllamaResponse(response, techData) {
+        try {
+            // Extract JSON from the response
+            const jsonMatch = response.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                throw new Error('No JSON found in response');
+            }
+
+            const parsed = JSON.parse(jsonMatch[0]);
+            
+            // Version validation - check for invalid version suggestions
+            const responseText = JSON.stringify(parsed);
+            const currentVersion = techData.currentVersion || '';
+            const latestVersion = techData.latestVersion || '';
+            
+            // Look for version numbers that aren't in our provided data
+            const versionPattern = /version\s+(\d+(?:\.\d+)*(?:\+)?)/gi;
+            const suggestedVersions = [];
+            let match;
+            while ((match = versionPattern.exec(responseText)) !== null) {
+                suggestedVersions.push(match[1]);
+            }
+            
+            // Validate suggested versions
+            for (const version of suggestedVersions) {
+                if (version !== currentVersion && 
+                    version !== latestVersion && 
+                    !currentVersion.includes(version) && 
+                    !latestVersion.includes(version)) {
+                    console.warn(`🚨 VERSION VALIDATION: AI suggested invalid version ${version} for ${techData.technology}. Current: ${currentVersion}, Latest: ${latestVersion}`);
+                }
+            }
+            
+            return {
+                aiPriority: parsed.priority || 'medium',
+                aiSummary: parsed.summary || '',
+                aiCategory: parsed.category || 'other',
+                recommendations: parsed.recommendations || [],
+                nextSteps: parsed.nextSteps || [],
+                aiRisks: parsed.risks || [],
+                aiBenefits: parsed.benefits || [],
+                aiUrgency: parsed.urgency || '',
+                upgradeComplexity: parsed.complexity || 'medium',
+                enhancedByAI: true,
+                aiProvider: 'ollama-local',
+                analysisDate: new Date().toISOString(),
+                // Include original analysis data
+                securityScore: this.calculateSecurityScore(techData, parsed),
+                stabilityScore: this.calculateStabilityScore(techData, parsed),
+                estimatedEffort: parsed.complexity || 'medium',
+                versionGap: this.analyzeVersions(techData.currentVersion, techData.latestVersion).gap
+            };
+
+        } catch (error) {
+            console.warn('Failed to parse Ollama response:', error);
+            
+            // Fallback: return enhanced rule-based analysis with complete AI summary
+            const ruleBasedAnalysis = this.performRuleBasedAnalysis(techData);
+            return {
+                ...ruleBasedAnalysis,
+                aiSummary: response.replace(/```json|```|\{[\s\S]*\}/, '').trim() || 'AI analysis completed for this technology component.',
+                enhancedByAI: true,
+                aiProvider: 'ollama-local-fallback'
+            };
+        }
+    }
+
+    performRuleBasedAnalysis(techData) {
+        // Version analysis
+        const versionAnalysis = this.analyzeVersions(techData.currentVersion, techData.latestVersion);
+        
+        // EOL and Support analysis
+        const lifecycleAnalysis = this.analyzeEOL(techData.eolDate, techData.supportStatus);
+        
+        // Determine final priority - EOL/Support takes precedence over version gaps
+        const priorities = ['low', 'medium', 'high', 'critical'];
+        const versionPriority = priorities.indexOf(versionAnalysis.priority);
+        const lifecyclePriority = priorities.indexOf(lifecycleAnalysis.priority);
+        
+        // If lifecycle is medium+ priority, use it; otherwise use higher of version or lifecycle
+        const finalPriority = lifecyclePriority >= 1 ? 
+            priorities[lifecyclePriority] : 
+            priorities[Math.max(versionPriority, lifecyclePriority)];
+        
+        // Combine recommendations
+        const allRecommendations = [
+            ...this.generateBasicRecommendations(techData),
+            ...lifecycleAnalysis.recommendations
+        ];
+        
+        return {
+            aiPriority: finalPriority,
+            versionGap: versionAnalysis.gap,
+            recommendations: allRecommendations,
+            nextSteps: this.generateBasicNextSteps(techData),
+            securityScore: lifecyclePriority >= 2 ? 70 : 85, // Lower security score if support/EOL issues
+            stabilityScore: 90,
+            estimatedEffort: 'medium',
+            enhancedByAI: false,
+            analysisType: 'rule-based'
+        };
+    }
+
+    generateBasicRecommendations(techData) {
+        const recommendations = [];
+        
+        // Generic recommendations based on version gap
+        const versionGap = this.analyzeVersions(techData.currentVersion, techData.latestVersion);
+        
+        if (versionGap.priority === 'critical') {
+            recommendations.push('🚨 Critical update required - security or compatibility issues likely');
+            recommendations.push('📋 Review breaking changes immediately');
+            recommendations.push('🧪 Test in development environment ASAP');
+        } else if (versionGap.priority === 'high') {
+            recommendations.push('⚡ Significant update available with likely improvements');
+            recommendations.push('📚 Review release notes and migration guides');
+            recommendations.push('🔍 Check for breaking changes');
+        } else {
+            recommendations.push('🔄 Consider updating when convenient');
+            recommendations.push('📊 Monitor for security advisories');
+            recommendations.push('📈 Review new features and improvements');
+        }
+        
+        return recommendations;
+    }
+
+    generateBasicNextSteps(techData) {
+        return [
+            '📖 Review official upgrade documentation',
+            '🧪 Set up testing environment',
+            '📅 Plan upgrade timeline'
+        ];
+    }
+
+    calculateSecurityScore(techData, aiAnalysis) {
+        let score = 85;
+        if (aiAnalysis.priority === 'critical') score -= 30;
+        else if (aiAnalysis.priority === 'high') score -= 15;
+        return Math.max(score, 0);
+    }
+
+    calculateStabilityScore(techData, aiAnalysis) {
+        let score = 90;
+        if (aiAnalysis.complexity === 'high') score -= 15;
+        return Math.max(score, 30);
+    }
+
+    showAIStatus(message) {
+        // Create or update AI status indicator
+        let statusEl = document.getElementById('ai-status');
+        if (!statusEl) {
+            statusEl = document.createElement('div');
+            statusEl.id = 'ai-status';
+            statusEl.className = 'ai-status-indicator';
+            
+            const headerActions = document.querySelector('.header-actions');
+            if (headerActions) {
+                headerActions.appendChild(statusEl);
+            }
+        }
+        
+        statusEl.innerHTML = `
+            <span class="ai-status-text">${message}</span>
+            <button class="ai-config-btn" onclick="aiManager.showAIConfig()" title="AI Configuration">
+                <i class="fas fa-cog"></i>
+            </button>
+        `;
+    }
+
+    showAIConfig() {
+        const modal = document.createElement('div');
+        modal.className = 'modal ai-config-modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2><i class="fas fa-brain"></i> Local AI Configuration</h2>
+                    <button class="close-btn" onclick="this.parentElement.parentElement.parentElement.remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="ai-status-section">
+                        <h3>Status</h3>
+                        <div class="status-item">
+                            <span>Ollama: </span>
+                            <span class="${this.localAI.available ? 'status-good' : 'status-error'}">
+                                ${this.localAI.available ? '✅ Available' : '❌ Not Available'}
+                            </span>
+                        </div>
+                        <div class="status-item">
+                            <span>Local AI: </span>
+                            <span class="${this.localAI.enabled ? 'status-good' : 'status-neutral'}">
+                                ${this.localAI.enabled ? '✅ Enabled' : '⚪ Disabled'}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    ${!this.localAI.available ? `
+                        <div class="setup-instructions">
+                            <h3>Setup Ollama</h3>
+                            <p>1. Download from <a href="https://ollama.ai/download" target="_blank">ollama.ai</a></p>
+                            <p>2. Run: <code>ollama run llama3.2:3b</code></p>
+                            <p>3. <button onclick="location.reload()" class="btn-primary btn-sm">Refresh Page</button></p>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="ai-controls">
+                        <label>
+                            <input type="checkbox" ${this.localAI.enabled ? 'checked' : ''} 
+                                   onchange="aiManager.toggleLocalAI(this.checked)">
+                            Enable Local AI Analysis
+                        </label>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+    }
+
+    toggleLocalAI(enabled) {
+        this.localAI.enabled = enabled;
+        localStorage.setItem('localAI_enabled', enabled.toString());
+        
+        if (enabled && this.localAI.available) {
+            this.showAIStatus('🤖 Local AI Enabled');
+        } else {
+            this.showAIStatus('📊 Using rule-based analysis');
+        }
+    }
 }
 
 // Global instance
@@ -2222,6 +4848,7 @@ let aiManager;
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     aiManager = new AITechStackManager();
+    window.aiManager = aiManager; // Make available globally for onclick handlers
 });
 
 // Add keyboard shortcuts
